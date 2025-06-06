@@ -2,21 +2,146 @@
 title: "TOUCH-BRAIN: Merge and Analyses"
 author: "Phuc TU Nguyen"
 date: "2025-06-06"
-output: html_document
+
 output:
   prettydoc::html_pretty:
     theme: cayman
     highlight: github
 ---
 
-## Initialise Packages
 ```{r setup, warning=FALSE, echo=FALSE, message=FALSE}
-rm(list=ls())
+## Set up libraries and define paths
+
+rm(list = ls())
 library(rstudioapi)
 
+script_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
+function_path <- file.path(script_path, "function")
+
+source(file.path(function_path, "loadconfig.R"))
+load_lib()
+load_path(script_path)
+load_palette()
+
+vps <- c("pilot004", "pilot006", "pilot007", "pilot008", "pilot009", "pilot010", "pilot011", "pilot012")
+
+```
 
 
-source("libraries.R")
-load_libraries()
+## Pool data
+Behavioral and EEG data are merged across all participants and blocks. Block number and trial number are assigned per condition (t/m &times; a/p &times; unimodal/both)
 
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+source(file.path(function_path, "loaddata.R"))
+# BEH ----
+beh_combined_df <- load_behdata(vps, pathlist$beh_data_path)
+beh_combined_df <- adjust_beh_df(beh_combined_df)
+# Test for sufficient blocks
+beh_test <- beh_combined_df %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
+  summarise(ntrial_beh = n(), .groups = "drop")
+
+# EEG ----
+eeg_combined_df <- load_eegdata(vps, pathlist$eeg_data_path)
+eeg_combined_df <- adjust_eeg_df(eeg_combined_df)
+
+# Test for sufficient blocks
+eeg_test <- eeg_combined_df %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
+  summarise(ntrial = n(), .groups = "drop")
+```
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+# Compare trial counts between behavioral and EEG data
+testmerge <- left_join(beh_test, eeg_test,
+  by = c("NAME", "QUESTION", "ACTIVE", "unimodal")
+) %>%
+  arrange(NAME, unimodal, QUESTION, ACTIVE) %>%
+  mutate(trialdiff = ntrial_beh - ntrial)
+
+# Merge full behavioral and EEG datasets
+merge_df <- left_join(beh_combined_df, eeg_combined_df,
+  by = c("NAME", "QUESTION", "ACTIVE", "unimodal", "trial_number")
+)
+
+# Export merged data to Excel
+xlsx_name <- format(Sys.time(), "BEH_EEG_Data_%d%m%Y.xlsx")
+write_xlsx(merge_df, file.path(pathlist$result_path, xlsx_name))
+```
+
+
+## Load and preprocess raw data 
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+xlsx_name <- format(Sys.time(), "BEH_EEG_Data_%d%m%Y.xlsx")
+source(file.path(function_path, "preprocessdata.R"))
+channels <- expand.grid(c("F", "Fc", "FC", "C", "CP", "P"), c("3", "5", "z", "4", "6"))
+channels <- paste0(channels$Var1, channels$Var2)
+```
+
+### Behavioral data
+
+**Target Length**: based on the task type (touchLength or movLength is selected).
+
+**Condition Labels (condN)**:
+
+- For self-touch trials:*1.Touch_Active*, *2.Touch_Passive*, *3.Move_Active*, and *4.Move_Passive*
+
+- For unimodal trials: *5.1.Unimodal_Touch* (pre), *5.2.Unimodal_Touch* (post), *6.1.Unimodal_Move_Active*, *7.1.Unimodal_Move_Passive*, etc.
+
+**Flipped Gain**: For touch trials, gain is inverted $|\frac{1}{gain}\ |$ and rounded; for movement trials, gain is used as-is.
+
+**Absolute Error**: Calculated as $|1-\frac{reported length}{true length}\ |$.
+
+
+```{r fig.width=4, fig.height=4, warning=FALSE, message=FALSE, echo=FALSE}
+rawData <- read_excel(path = file.path(pathlist$result_path, xlsx_name))
+rawData <- preprocess_beh_df(rawData) %>%
+  select(
+    sbjN, trialN, task, mov, unimodal, condN, BLOCK, trial_number,
+    flipped.gain, Target_length, RESPONSE, absError,
+    starts_with(channels)
+  )
+
+# Check number of trials per blk per ppt per phase
+test <- rawData %>% count(sbjN, condN)
+
+rawData %>%
+  arrange(sbjN, task, mov, unimodal, trialN) %>%
+  head(300) %>%
+  DT::datatable()
+```
+
+### EEG data
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+# EEG ----
+# Make long data
+
+longrawData <- long_beh_eeg_df(rawData)
+  
+longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_cols = c("channellocation_timing"))
+
+```
+
+
+```{r fig.width=13, fig.height=8, warning=FALSE, message=FALSE, echo=FALSE}
+# plot here
+
+ggplot(longData %>% filter(timing == 'dur' & !is.na(unimodal)), aes(x = powerBeta, y = absError)) +
+  geom_point() +
+  geom_smooth(method = "lm")  +
+  labs(
+    title = "Removing Outliers - Local Beta Power During Movement",
+    x = "Beta Power",
+    y = "Perceptual Interference \n(Normalized Absolute Error)"
+  ) +
+  facet_wrap(~sbjN) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16)
+  )
+  
 ```
