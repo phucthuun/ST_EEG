@@ -1,0 +1,527 @@
+---
+title: "TOUCH - BRAIN: Data format and Hypothesis"
+author: "Phuc T.U. Nguyen"
+date: "2025-05-26"
+
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+## Initialise Packages
+```{r setup, warning=FALSE, echo=FALSE, message=FALSE}
+rm(list=ls())
+library(rstudioapi)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(data.table)
+library(readxl)
+library(writexl)
+library(gridExtra)
+library(dplyr)
+library(broom)
+library(lme4)
+library(afex)
+```
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+two.color1 = c("#0072B2", "#E69F00") 
+two.color2 = c("#882E72","#117733")
+three.color = c("#882E72","#117733", "#E69F00")
+```
+
+## Pool data
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+script_path = rstudioapi::getActiveDocumentContext()$path %>% dirname()
+source_path = dirname(script_path)
+beh.data_path = source_path %>% file.path("03_Data") %>% file.path("beh")
+eeg.data_path = source_path %>% file.path("05_Result") %>% file.path("eeg","preprocessing")
+result_path = source_path %>% file.path("05_Result") %>% file.path("merge")
+vps=c("pilot004","pilot005","pilot006","pilot007","pilot008","pilot009","pilot010","pilot011","pilot012")
+# vps=c("pilot004","pilot005","pilot006", "pilot010","pilot011","pilot012")
+```
+
+
+Behavioral and EEG data:
+
+- Merge all participants and blocks
+
+- Per condition (t/m * a/p * unimodal/both): assign block number and trial number
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+# Beh 
+df_list <- list()
+for (vp in vps) {
+  all_files = list.files(path=beh.data_path,pattern = "*.csv")
+  specific_files = all_files[grepl(paste0("^",vp), all_files)]%>%sort()
+  
+  for (file in specific_files) {
+    temp_df <- read.csv(file.path(beh.data_path,file), header = TRUE)
+    # Fix error: double header
+    if (all(names(temp_df)[-24] == as.character(temp_df[1, ])[-24])) {
+      temp_df <- temp_df[-1, ] # Remove the duplicate header row
+      rownames(temp_df) <- NULL
+      }
+    # Fix error: missing X column
+    if (ncol(temp_df)==23) {temp_df$X = NA}
+    
+    temp_df = temp_df %>% mutate(filename=file,.before=GAIN)
+    df_list[[length(df_list) + 1]] <- temp_df
+  }
+  
+  
+}
+
+beh_combined_df <- do.call(rbind, df_list)%>%
+  mutate(NAME=str_extract(filename, "^[^_]+")%>%str_remove("unimodal\\d+"),
+         unimodal=str_extract(filename, "(?<=unimodal)\\d+"), .before=GAIN)%>%
+  group_by(NAME,QUESTION,ACTIVE,unimodal)%>%
+  mutate(BLOCK = as.integer(factor(TIMESTAMP, levels = unique(TIMESTAMP))),.before=GAIN)%>%
+  ungroup()%>%
+  arrange(NAME,TIMESTAMP,BLOCK,TRIALNB)%>%
+  group_by(NAME,QUESTION,ACTIVE,unimodal)%>%
+  mutate(trial_number = row_number(),
+         .before=GAIN)
+
+# Test for sufficient blocks  
+beh.test=beh_combined_df %>%
+  group_by(NAME,QUESTION,ACTIVE,unimodal)%>%
+  summarise(ntrial.beh=n()) %>% ungroup()
+```
+
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+#EEG 
+df_list <- list()
+for (vp in vps){
+  all_files = list.files(path=eeg.data_path,pattern = "*.xlsx")
+  specific_files = all_files[grepl(paste0("^",vp), all_files)]
+  
+  for (file in specific_files) {
+    temp_df = read_xlsx(file.path(eeg.data_path,file))%>%
+      mutate(filename=file)%>%
+      tibble::rownames_to_column("trial_number")#%>%
+      # select(filename,trial_number, MovDur,
+             # starts_with("C3_"),
+             # # starts_with("Cz_"),
+             # starts_with("C4_"))
+    df_list[[length(df_list) + 1]] <- temp_df
+    }
+  }
+
+
+# Combine them all, keeping all columns
+eeg_combined_df <- bind_rows(df_list) %>%
+  mutate(NAME=str_extract(filename, "^[^_]+")%>%str_remove("unimodal\\d+"),
+         QUESTION=str_match(filename, "^[^_]+_([^_]+)_")[,2]%>%str_sub(1, 1),
+         ACTIVE=str_match(filename, "^[^_]+_[^_]+_([^_]+)_")[,2]%>%str_sub(1, 1),
+         unimodal=str_extract(filename, "(?<=unimodal)\\d+"),
+         trial_number=trial_number%>%as.numeric(),
+         .after=filename)%>%
+  mutate(ACTIVE=case_when(is.na(ACTIVE)~'a', !is.na(ACTIVE)~ACTIVE))
+
+# Test for sufficient blocks  
+eeg.test=eeg_combined_df %>%
+  group_by(NAME,QUESTION,ACTIVE,unimodal)%>%
+  summarise(ntrial=n()) %>% ungroup()
+```
+*Note*: checked: 
+0. pilot004
+
+1. pilot006 all good
+
+2. pilot007 not enough preprocessed egg dataset
+
+3. pilot008 all good, remember to discard Block1 passive move
+
+4. pilot009 missing trial, do not use further
+
+5. pilot010 all good
+
+6. pilot011 all good
+
+7. pilot012 all good
+
+
+Save BEH+EEG data
+
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+(testmerge=left_join(beh.test,eeg.test,
+               by=c("NAME","QUESTION","ACTIVE","unimodal"))%>%
+   arrange(NAME,unimodal,QUESTION,ACTIVE) %>%
+   mutate(trialdiff = ntrial.beh - ntrial))
+
+merge_df = left_join(beh_combined_df,eeg_combined_df,
+                     by=c('NAME','QUESTION','ACTIVE','unimodal','trial_number'))
+
+xlsx_name = format(Sys.time(), "BEH_EEG_Data_%d%m%Y.xlsx")
+write_xlsx(merge_df, file.path(result_path,xlsx_name))
+
+```
+
+
+## Load and preprocess raw data 
+```{r fig.width=4, fig.height=4, warning=FALSE, message=FALSE, echo=FALSE}
+# rm(list = ls()[sapply(ls(), function(x) is.data.frame(get(x)))])
+# rm(list = ls()[sapply(ls(), function(x) is.list(get(x)))])
+
+data <- read_excel(path=file.path(result_path,xlsx_name)) %>%
+  rename(sbjN = NAME,
+         trialN = TRIALNB,
+         task = QUESTION,
+         mov = ACTIVE) %>%
+  mutate(touchLength = as.numeric(DISTANCE_TACT),
+         movLenght = as.numeric(DISTANCE_MOV),
+         gain = as.numeric(GAIN),
+         resp = as.numeric(RESPONSE))
+
+rawData <- data %>%
+  filter(!is.na(C3_dur) & !is.na(C4_dur)) %>%
+  mutate(Target_length = case_when(
+    task == "t" ~ touchLength,
+    task == "m" ~ movLenght),
+    condN = case_when(
+      task == "t" & mov == "a" ~ "1.Touch_Active",
+      task == "t" & mov == "p" ~ "2.Touch_Passive",
+      task == "m" & mov == "a" ~ "3.Move_Active",
+      task == "m" & mov == "p" ~ "4.Move_Passive",),
+    flipped.gain = ifelse(task=='m', gain, 1/gain %>%
+                            round(1))) %>%
+  mutate(condN = case_when(
+    is.na(unimodal) ~ condN,
+    !is.na(unimodal) ~ paste0(condN,"_Unimodal")))%>%
+  filter(sbjN != "NAME")#,
+    #       gain != 1.25,
+    #       gain != 0.8)
+           
+
+rawData$task <- factor(rawData$task, levels = c("t", "m"), labels = c("Judge Touch", "Judge Movement"))
+rawData$mov <- factor(rawData$mov, levels = c("a", "p"), labels = c("Active", "Passive"))
+#rawData$gain <- factor(rawData$gain, levels = c(1.500000, 1.000000, 0.666667), labels = c("M>T", "M=T", "M<T"))
+
+
+test <- rawData %>% # Check number of trials per blk per ppt per phase
+  count(sbjN, condN)
+
+
+channels = expand.grid(c("F","Fc","FC","C","CP","P"),c("3","5","z","4","6"))
+channels = paste0(channels$Var1,channels$Var2)
+
+(rawData %>%
+        mutate(absError=abs(RESPONSE-Target_length/Target_length))%>%
+  select(sbjN, trialN, BLOCK, task, mov, unimodal, BLOCK, GAIN, Target_length, RESPONSE, absError,
+         starts_with(c("C3","C4")))%>%
+  arrange(sbjN, trialN, task, mov, unimodal, BLOCK, GAIN, Target_length, RESPONSE, absError)%>%
+  DT::datatable())
+
+
+```
+
+## Unimodal conditions
+<center style="color:#15925E;">**Does touch/movement only cause beta ERD? At which hemisphere?**</center>
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+
+df = rawData%>%
+  filter(!is.na(unimodal))%>%
+  mutate(mov=case_when(task=="Judge Touch"~"",
+                       task!="Judge Touch"~paste0(mov," ")),
+         group=paste0(mov,task)%>%factor(),
+         absError=abs(RESPONSE-Target_length/Target_length))%>%
+  select(sbjN, trialN, task, mov, group, BLOCK, trial_number,GAIN, Target_length, RESPONSE, absError,
+         starts_with(channels))%>%
+  melt(id.vars = c("sbjN", "trialN", "task", "mov", "group","BLOCK", 
+                   "trial_number", "GAIN", "Target_length", "RESPONSE", "absError"),
+       variable.name = "channel_location",
+       value.name = "powerBeta")%>%
+  mutate(location = channel_location %>% str_extract(".*(?=_)") %>% factor(levels = channels),
+         nrlocation = channel_location %>% str_extract("\\d*(?=_)"),
+         timing = channel_location %>% str_extract("(?<=_).*"),
+         )%>%
+  mutate(hemisphere = case_when(nrlocation %in% c("6","4")~"right",
+                                nrlocation %in% c("3","5")~"left",
+                                nrlocation %in% c("")~"mid"))%>%
+  filter(!is.na(powerBeta))%>%
+  group_by(sbjN,channel_location)%>%
+  filter(((powerBeta>=quantile(powerBeta, 0.25) - 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta,0.25))) &
+          (powerBeta<=quantile(powerBeta, 0.75) + 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta,0.25))) 
+          ))
+
+
+ggplot(df%>%filter(timing=="dur"))+ 
+  geom_bar(aes(x=hemisphere, y=powerBeta,fill=hemisphere), show.legend = F,
+           position = "dodge", stat = "summary", fun.y = "mean")+
+  labs(title="Local Beta Power During Movement", 
+       x="Unimodal Task",
+       y="Beta Power")+
+  scale_fill_manual(values = three.color)+
+  facet_wrap(~group)+
+  theme(plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+
+
+```
+
+
+<center style="color:#15925E;">**At which electrodes?**</center>
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(df%>%filter(timing=="dur"))+ 
+  geom_bar(aes(x=location, y=powerBeta,fill=hemisphere), show.legend = F,
+           position = "dodge", stat = "summary", fun.y = "mean")+
+  labs(title="Local Beta Power During Movement", 
+       x="Unimodal Task",
+       y="Beta Power")+
+  scale_fill_manual(values = three.color)+
+  facet_wrap(group~hemisphere)+
+  theme(plot.title=element_text(size = 19),
+        axis.text = element_text(size = 9),
+        axis.title=element_text(size = 16))
+
+```
+
+
+
+<center style="color:#15925E;">**Does touch/movement only cause beta ERD at C3/C4?**</center>
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+df = rawData%>%
+  filter(!is.na(unimodal))%>%
+  mutate(mov=case_when(task=="Judge Touch"~"",
+                       task!="Judge Touch"~paste0(mov," ")))%>%
+  mutate(group=paste0(mov,task)%>%factor(),
+         powerSum=C3_dur+C4_dur,
+         powerDiff=C3_dur-C4_dur,
+         absError=abs(RESPONSE-Target_length/Target_length))
+
+```
+
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+dfplot=df%>%
+  filter((!is.na(C3_dur) & (task == "Judge Movement")) |
+         (!is.na(C4_dur) & (task == "Judge Touch" ))) %>%
+  mutate(contralateral=case_when(task=="Judge Touch" ~ C4_dur,
+                             task=="Judge Movement" ~ C3_dur),
+         ipsilateral=case_when(task=="Judge Touch" ~ C3_dur,
+                             task=="Judge Movement" ~ C4_dur))%>%
+  select(sbjN,trial_number,task,mov,group,absError,contralateral,ipsilateral) %>%
+  melt(id.vars = c("sbjN", "trial_number","task","mov","group","absError"),
+       variable.name = "channel_location",
+       value.name = "powerBeta")%>%
+  group_by(sbjN,group,channel_location)%>%
+  filter(((powerBeta>=quantile(powerBeta, 0.25) - 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta,0.25))) &
+          (powerBeta<=quantile(powerBeta, 0.75) + 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta,0.25))) 
+          ))%>%
+  ungroup()
+  
+
+ggplot(dfplot)+ 
+  geom_bar(aes(x=group, y=powerBeta,fill=group), show.legend = F,
+           position = "dodge", stat = "summary", fun.y = "mean")+
+  labs(title="Local Beta Power During Movement", 
+       x="Unimodal Task",
+       y="Beta Power")+
+  scale_fill_manual(values = three.color)+
+  facet_wrap(~channel_location)+
+  theme(plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+```
+
+
+<center style="color:#15925E;">**CONTROL FOR LOCAL WAKEFULNESS**</center>
+
+<center style="color:#15925E;">**A lower power of the beta band in the contralateral hemisphere** is associated with **larger estimation error**, i.e., the estimation deviates more from the truth.</center>
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+
+max_abs <- max(abs(dfplot$powerBeta))
+
+ggplot(dfplot, aes(x=powerBeta,y=absError,group=group,color=group))+
+  geom_point()+
+  geom_smooth(method='lm')+
+  labs(title="Local Beta Power During Movement", 
+       x="Contralateral Beta Power",
+       y="Perceptual Interference \n(Normalized Absolute Error)")+
+  scale_color_manual("Task", values = three.color)+
+  facet_wrap(~channel_location)+
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 16),
+        plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+
+ggplot(dfplot, aes(x=powerBeta,y=absError,group=group,color=group))+
+  geom_point()+
+  geom_smooth(method='lm')+
+  labs(title="Local Beta Power During Movement", 
+       x="Contralateral Beta Power",
+       y="Perceptual Interference \n(Normalized Absolute Error)")+
+  scale_color_manual("Task", values = three.color)+
+  facet_wrap(sbjN~channel_location)+
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 16),
+        plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+```
+
+## Self-touch conditions
+  - **Normalized Absolute Error** quantifies *perceptual interference*, i.e., the degree to which the perceptual judgement deviates from the true value OR how much the perceptual judgement is interfered by other information.
+  
+  $$Perceptual Inference = |1-\frac{reported length}{true length}\ |$$
+  
+  - **Beta Power Difference** between the left hemisphere (C3) and the right hemisphere (C4) represents the degree to which motor information influences tactile information. Larger difference implies stronger interference of motor information, while lower difference implies stronger interference of tactile information in the perceptual judgement. 
+  
+  - **Beta Power Sum** of the left hemisphere (C3) and the right hemisphere (C4) represents the global beta power that implies participants' wakefulness. 
+  
+  $$\Delta{B} = B_{C3} - B_{C4}$$
+  
+  
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+df = rawData%>%
+  filter(is.na(unimodal))%>%
+  mutate(group=paste(task,mov,sep='-'),
+         powerSum=C3_dur+C4_dur,
+         powerDiff=C3_dur-C4_dur,
+         absError=abs(RESPONSE-Target_length/Target_length))
+
+```
+<p></p><p></p><p></p>  
+<center style="color:#15925E;">**PREDICTION**</center>
+
+<center style="color:#15925E;">When **the beta power in the contralateral hemisphere is lower than the beta power in the ipsilateral hemisphere**, then there will be **LARGER interference of the irrelevant information**, i.e., the estimation deviates more from the truth.</center>
+
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+
+dfplot=df%>%
+  mutate(powerBeta=powerDiff)%>%
+  filter(!is.na(powerBeta)) %>%
+  filter((powerBeta >= quantile(powerBeta, 0.25) - 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta, 0.25))) &
+           (powerBeta <= quantile(powerBeta, 0.75) + 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta,0.25))))
+max_abs <- max(abs(dfplot$powerBeta))
+ggplot(dfplot, aes(x=powerBeta,y=absError,group=task,color=task))+
+  geom_vline(xintercept = 0,linetype="dashed")+
+  geom_point()+
+  geom_smooth(method='lm')+
+  # geom_text(aes(label="More motor influence", x=.5,y=10),hjust = 0.5,color=two.color2[1])+
+  # geom_text(aes(label="Less motor influence", x=-.5,y=10),hjust = 0.5,color=two.color2[2])+
+  coord_cartesian(xlim = c(-max_abs, max_abs)) +
+  labs(title="Difference in Beta Power During Movement", 
+       x="Beta Power Difference: C3 - C4",
+       y="Perceptual Interference \n(Normalized Absolute Error)")+
+  scale_color_manual("Task", values = two.color2)+
+  facet_wrap(~mov)+
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 16),
+        plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+
+```
+
+
+<center style="color:#15925E;">**CONTROL FOR GLOBAL WAKEFULNESS**</center>
+
+<center style="color:#15925E;">**A lower global power of the beta band** is associated with **larger estimation error**, i.e., the estimation deviates more from the truth.</center>
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+
+dfplot=df%>%
+  mutate(powerBeta=powerSum)%>%
+  filter(!is.na(powerBeta)) %>%
+  filter((powerBeta >= quantile(powerBeta, 0.25) - 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta, 0.25))) &
+           (powerBeta <= quantile(powerBeta, 0.75) + 1.5 * (quantile(powerBeta, 0.75) - quantile(powerBeta,0.25))))
+max_abs <- max(abs(dfplot$powerBeta))
+ggplot(dfplot, aes(x=powerBeta,y=absError,group=task,color=task))+
+  # geom_vline(xintercept = 0,linetype="dashed")+
+  geom_point()+
+  geom_smooth(method='lm')+
+  labs(title="Sum of Beta Power During Movement", 
+       x="Beta Power Sum: C3 + C4",
+       y="Perceptual Interference \n(Normalized Absolute Error)")+
+  scale_color_manual("Task", values = two.color2)+
+  facet_wrap(~mov)+
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 16),
+        plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+```
+
+
+<center style="color:#15925E;">**CONTROL FOR LOCAL WAKEFULNESS**</center>
+
+<center style="color:#15925E;">**A lower power of the beta band in the contralateral hemisphere** is associated with **larger estimation error**, i.e., the estimation deviates more from the truth.</center>
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+
+dfplot=df%>%
+  filter((!is.na(C3_dur) & (task == "Judge Movement")) |
+         (!is.na(C4_dur) & (task == "Judge Touch" ))) %>%
+  filter(((C3_dur>=quantile(C3_dur, 0.25) - 1.5 * (quantile(C3_dur, 0.75) - quantile(C3_dur,0.25))) &
+          (C3_dur<=quantile(C3_dur, 0.75) + 1.5 * (quantile(C3_dur, 0.75) - quantile(C3_dur,0.25))) &
+          (task == "Judge Movement")) |
+         ((C4_dur>=quantile(C4_dur, 0.25) - 1.5 * (quantile(C4_dur, 0.75) - quantile(C4_dur,0.25))) &
+          (C4_dur<=quantile(C4_dur, 0.75) + 1.5 * (quantile(C4_dur, 0.75) - quantile(C4_dur,0.25))) &
+          (task == "Judge Touch" )))%>%
+  mutate(powerBeta=case_when(task=="Judge Touch" ~ C4_dur,
+                             task=="Judge Movement" ~ C3_dur))
+
+
+max_abs <- max(abs(dfplot$powerBeta))
+ggplot(dfplot, aes(x=powerBeta,y=absError,group=task,color=task))+
+  # geom_vline(xintercept = 0,linetype="dashed")+
+  geom_point()+
+  geom_smooth(method='lm')+
+  labs(title="Local Beta Power During Movement", 
+       x="Contralateral Beta Power",
+       y="Perceptual Interference \n(Normalized Absolute Error)")+
+  scale_color_manual("Task", values = two.color2)+
+  facet_wrap(~mov)+
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 16),
+        plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+```
+
+
+<center style="color:#15925E;">**A lower power of the beta band in the ipsilateral hemisphere** is associated with **smaller estimation error**, i.e., the estimation deviates more from the truth.</center>
+
+```{r fig.width=15, fig.height=8, echo=FALSE, warning=FALSE, message=FALSE}
+
+dfplot=df%>%
+  filter((!is.na(C4_dur) & (task == "Judge Movement")) |
+           (!is.na(C3_dur) & (task == "Judge Touch" ))) %>%
+  filter(((C4_dur>=quantile(C4_dur, 0.25) - 1.5 * (quantile(C4_dur, 0.75) - quantile(C4_dur,0.25))) &
+            (C4_dur<=quantile(C4_dur, 0.75) + 1.5 * (quantile(C4_dur, 0.75) - quantile(C4_dur,0.25))) &
+            (task == "Judge Movement")) |
+           ((C3_dur>=quantile(C3_dur, 0.25) - 1.5 * (quantile(C3_dur, 0.75) - quantile(C3_dur,0.25))) &
+              (C3_dur<=quantile(C3_dur, 0.75) + 1.5 * (quantile(C3_dur, 0.75) - quantile(C3_dur,0.25))) &
+              (task == "Judge Touch" )))%>%
+  mutate(powerBeta=case_when(task=="Judge Touch" ~ C3_dur,
+                             task=="Judge Movement" ~ C4_dur))
+
+
+max_abs <- max(abs(dfplot$powerBeta))
+ggplot(dfplot, aes(x=powerBeta,y=absError,group=task,color=task))+
+  # geom_vline(xintercept = 0,linetype="dashed")+
+  geom_point()+
+  geom_smooth(method='lm')+
+  labs(title="Local Beta Power During Movement", 
+       x="Ipsilateral Beta Power",
+       y="Perceptual Interference \n(Normalized Absolute Error)")+
+  scale_color_manual("Task", values = two.color2)+
+  facet_wrap(~mov)+
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 16),
+        plot.title=element_text(size = 19),
+        axis.text = element_text(size = 14),
+        axis.title=element_text(size = 16))
+```
