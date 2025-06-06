@@ -1,0 +1,22 @@
+---
+title: "TOUCH-BRAIN: Merge and Analyses"
+author: "Phuc TU Nguyen"
+date: "2025-06-06"
+output: html_document
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+## Initialise Packages
+```{r setup, warning=FALSE, echo=FALSE, message=FALSE}
+rm(list=ls())
+library(rstudioapi)
+
+
+
+source("libraries.R")
+load_libraries()
+
+```
