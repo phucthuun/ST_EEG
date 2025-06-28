@@ -1,7 +1,7 @@
 # load libraties
 load_lib <- function() {
   packages <- c(
-    "rstudioapi", "stringr", "ggplot2", "tidyr", "dplyr", "data.table", "tibble",
+    "rstudioapi", "stringr", "ggplot2", "cowplot", "tidyr", "dplyr", "data.table", "tibble", "rstatix",
     "readxl", "writexl", "gridExtra", "broom", "lme4", "afex"
   )
   invisible(lapply(packages, function(pkg) {
@@ -29,9 +29,14 @@ load_path <- function(script_path) {
 # load palettes
 load_palette <- function() {
   palette <- list(
-    two.color1 = c("#0072B2", "#E69F00"),
-    two.color2 = c("#882E72", "#117733"),
-    three.color = c("#882E72", "#117733", "#E69F00")
+    two.color1 = c("#CC79A7","#0072B2"),
+    three.color1 = c("#117733", "#D55E00","#0072B2"),
+    # Unimodal conditions
+    three.color2 = c("#009E73", "#E69F00", "#56B4E9"),
+    # Self-touch conditions
+    four.color1 = c("#882E72", "#117733", "#D55E00","#0072B2"),
+    # All conditions
+    eight.color1 = c("#882E72", "#117733", "#D55E00","#0072B2", "#009E73", "#E69F00", "#56B4E9")
   )
   assign("palette", palette, envir = .GlobalEnv)
 }
