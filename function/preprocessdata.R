@@ -12,7 +12,7 @@ preprocess_beh_df <- function(df) {
       movLength = as.numeric(DISTANCE_MOV),
       gain = as.numeric(GAIN),
       resp = as.numeric(RESPONSE),
-      .before = MovDur
+      # .before = MovDur
     )
   df <- df %>%
     mutate(
@@ -20,6 +20,10 @@ preprocess_beh_df <- function(df) {
       Target_length = case_when(
         task == "t" ~ touchLength,
         task == "m" ~ movLength
+      ),
+      Interference_length = case_when(
+        task == "m" ~ touchLength,
+        task == "t" ~ movLength
       ),
 
       # Create condition labels
@@ -30,19 +34,31 @@ preprocess_beh_df <- function(df) {
         is.na(unimodal) & task == "m" & mov == "a" ~ "3.Move_Active",
         is.na(unimodal) & task == "m" & mov == "p" ~ "4.Move_Passive",
         # unimodal
-        !is.na(unimodal) & task == "t" & mov == "a" ~ paste0("5.", unimodal, ".Unimodal_Touch"),
-        !is.na(unimodal) & task == "m" & mov == "a" ~ paste0("6.", unimodal, ".Unimodal_Move_Active"),
-        !is.na(unimodal) & task == "m" & mov == "p" ~ paste0("7.", unimodal, ".Unimodal_Move_Passive"),
+        !is.na(unimodal) & task == "t" & mov == "a" ~ "5.Unimodal_Touch",
+        !is.na(unimodal) & task == "m" & mov == "a" ~ "6.Unimodal_Move_Active",
+        !is.na(unimodal) & task == "m" & mov == "p" ~ "7.Unimodal_Move_Passive",
       ),
 
       # Flip gain for touch trials
-      flipped.gain = ifelse(task == "m", gain, round(1 / gain, 1)),
-      absError = abs((RESPONSE - Target_length) / Target_length),
-      .before = MovDur
-    )
+      flipped.gain = ifelse(task == "m", round(gain, 1), round(1 / gain, 1)),
+      estError = (resp - Target_length) / Target_length,
+      absError = abs((resp - Target_length) / Target_length),
+      delta = abs((resp - Target_length) / (Interference_length)),
+      # .before = MovDur
+    ) %>%
+    # unimodal block as 1 or 2; unimodal as 1 or NA
+    mutate(BLOCK = case_when(!is.na(unimodal) ~ BLOCK * as.numeric(unimodal),
+                             is.na(unimodal)  ~ BLOCK)) %>%
+    mutate(unimodal = case_when(!is.na(unimodal) ~ 1,
+                                is.na(unimodal) ~ 0))
 
   df$task <- factor(df$task, levels = c("t", "m"), labels = c("Judge Touch", "Judge Movement"))
   df$mov <- factor(df$mov, levels = c("a", "p"), labels = c("Active", "Passive"))
+  df$unimodal <- factor(df$unimodal, levels = c(0,1), labels = c("Self-touch", "Unimodal"))
+
+
+
+
   return(df)
 }
 
@@ -72,6 +88,15 @@ long_beh_eeg_df <- function(df) {
         task == "Judge Touch" & hemisphere == "left" ~ "ipsilateral",
       )
     )
+  df$timing <- factor(df$timing, levels = c("pre", "dur", "early", "late", "post"), labels = c("Before Movement", "During Movement", "Early Movement", "Late Movement", "After Movement"))
+  
+  return(df)
+}
+
+
+short_beh_eeg_df <- function(df) {
+  df <- df %>%
+    pivot_wider(names_from = channellocation_timing, values_from = powerBeta)
   return(df)
 }
 
