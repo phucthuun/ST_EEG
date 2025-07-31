@@ -19,8 +19,8 @@ load_path <- function(script_path) {
   pathlist <- list(
     script_path = script_path,
     source_path = source_path,
-    beh_data_path = file.path(source_path, "03_Data", "beh"),
-    eeg_data_path = file.path(source_path, "05_Result", "eeg", "preprocessing"),
+    beh_data_path = file.path(source_path, "03_DataMain", "beh"),
+    eeg_data_path = file.path(source_path, "05_Result", "eeg", "xlsx"),
     result_path = file.path(source_path, "05_Result", "merge")
   )
   assign("pathlist", pathlist, envir = .GlobalEnv)
