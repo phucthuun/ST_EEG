@@ -73,8 +73,7 @@ load_eegdata <- function(vps, path, pattern = "*.xlsx") {
       file_path <- file.path(path, file)
       
       temp_df <- read_xlsx(file_path) %>%
-        mutate(filename = file) %>%
-        rownames_to_column("trial_number")
+        mutate(filename = file, .before = MovDur) 
       
       df_list[[length(df_list) + 1]] <- temp_df
     }
@@ -92,7 +91,6 @@ adjust_eeg_df <- function(df) {
       QUESTION = str_match(filename, "^[^_]+_([^_]+)_")[, 2] %>% str_sub(1, 1),
       ACTIVE = str_match(filename, "^[^_]+_[^_]+_([^_]+)_")[, 2] %>% str_sub(1, 1),
       unimodal = str_extract(filename, "(?<=unimodal)\\d+"),
-      trial_number = as.numeric(trial_number),
       .after = filename
     ) %>%
     mutate(
@@ -100,7 +98,10 @@ adjust_eeg_df <- function(df) {
         is.na(ACTIVE) ~ "a",
         TRUE ~ ACTIVE
       )
-    )
+    ) %>%
+    group_by(NAME, QUESTION, ACTIVE, unimodal)%>%
+    mutate(filename=filename,
+           trial_number = row_number(), .before=MovDur)
   return(df)
   
 }
