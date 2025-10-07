@@ -94,6 +94,12 @@ long_beh_eeg_df <- function(df) {
 }
 
 
+half_beh_eeg_df <- function(df) {
+  df <- df %>%
+    pivot_wider(names_from = location, values_from = powerBeta)
+  return(df)
+}
+
 short_beh_eeg_df <- function(df) {
   df <- df %>%
     pivot_wider(names_from = channellocation_timing, values_from = powerBeta)
