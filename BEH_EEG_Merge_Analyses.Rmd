@@ -27,7 +27,7 @@ load_lib()
 load_path(script_path)
 load_palette()
 
-phases <- c("Movement Cue", "Before Movement", "Early Movement", "Half Movement", "Late Movement", "After Movement")
+phases <- c("Movement Cue", "Full Movement","Before Movement", "Early Movement", "Half Movement", "Late Movement", "After Movement")
 vps <- c("P")
 ```
 
@@ -170,15 +170,11 @@ rawData <- preprocess_beh_df(rawData) %>%
 
 # Check number of trials per blk per ppt per phase
 test <- rawData %>% count(sbjN, condN)
-<<<<<<< HEAD
-=======
-
 rawData %>%
   select(sbjN, condN, BLOCK, trialN, flipped.gain, Target_length, resp, 
-         C3_movcue, C4_movcue, C3_pre, C4_pre, C3_early, C4_early, C3_half, C4_half, C3_late, C4_late, C3_post, C4_post) %>%
+         C3_full, C4_full, C3_early, C4_early, C3_late, C4_late) %>%
   arrange(sbjN, condN, BLOCK, trialN) %>%
   rmarkdown::paged_table(options = list(rows.print = 10, cols.print = 9))
->>>>>>> 4ec2824fed79f8923ad1cb7da42c4a6788594a56
 ```
 
 ```{r fig.width=12, fig.height=5, echo=FALSE, warning=FALSE, message=FALSE}
@@ -207,14 +203,11 @@ longData$resp %>% hist()
 
 shortData <- short_beh_eeg_df(longData %>% select(sbjN:powerBeta)) %>%
   mutate(unimodal = as.factor(unimodal))
-<<<<<<< HEAD
 
 testmerge4 <- shortData %>%
   mutate(sbjN = str_extract(sbjN, "\\d+") %>% as.numeric()) %>%
   group_by(sbjN, task, mov, unimodal)%>%
   summarise(n = n())
-=======
-
 
 parData <- longData %>%
   select(sbjN:delta, location, timing, powerBeta) %>%
