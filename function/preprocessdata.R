@@ -92,7 +92,7 @@ long_beh_eeg_df <- function(df) {
         task == "Judge Touch" & hemisphere == "left" ~ "ipsilateral",
       )
     )
-  df$timing <- factor(df$timing, levels = c("movcue", "pre", "dur", "early", "half", "late", "post"), labels = c("Movement Cue", "Before Movement", "During Movement", "Early Movement", "Half Movement", "Late Movement", "After Movement"))
+  df$timing <- factor(df$timing, levels = c("movcue", "full", "pre", "dur", "early", "half", "late", "post"), labels = c("Movement Cue", "Full Movement","Before Movement", "During Movement", "Early Movement", "Half Movement", "Late Movement", "After Movement"))
   
   return(df)
 }
