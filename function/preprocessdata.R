@@ -67,6 +67,7 @@ preprocess_beh_df <- function(df) {
 }
 
 # EEG ----
+# convert to long format
 long_beh_eeg_df <- function(df) {
   df <- df %>%
     pivot_longer(
@@ -92,18 +93,28 @@ long_beh_eeg_df <- function(df) {
         task == "Judge Touch" & hemisphere == "left" ~ "ipsilateral",
       )
     )
-  df$timing <- factor(df$timing, levels = c("movcue", "full", "pre", "dur", "early", "half", "late", "post"), labels = c("Movement Cue", "Full Movement","Before Movement", "During Movement", "Early Movement", "Half Movement", "Late Movement", "After Movement"))
+  df$timing <- factor(df$timing, levels = c("movcue", "full", 
+                                            "pre", 
+                                            "dur", 
+                                            "early", "half", "late", 
+                                            "post"), 
+                      labels = c("Movement Cue", "Full Movement",
+                                 "Before Movement", 
+                                 "During Movement", 
+                                 "Early Movement", "Half Movement", "Late Movement", 
+                                 "After Movement"))
   
   return(df)
 }
 
-
+# convert to half-wide format
 half_beh_eeg_df <- function(df) {
   df <- df %>%
     pivot_wider(names_from = location, values_from = powerBeta)
   return(df)
 }
 
+# convert to wide format
 short_beh_eeg_df <- function(df) {
   df <- df %>%
     pivot_wider(names_from = channellocation_timing, values_from = powerBeta)
