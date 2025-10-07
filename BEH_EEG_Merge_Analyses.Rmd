@@ -27,11 +27,13 @@ load_lib()
 load_path(script_path)
 load_palette()
 
-phases <- c("Movement Cue", "Full Movement",
-                                 "Before Movement", 
-                                 "During Movement", 
-                                 "Early Movement", "Half Movement", "Late Movement", 
-                                 "After Movement")
+phases <- c(
+  "Movement Cue",
+  "Before Movement",
+  "During Movement",
+  "Early Movement", "Half Movement", "Late Movement", "Full Movement",
+  "After Movement"
+)
 vps <- c("P")
 ```
 
@@ -59,9 +61,11 @@ eeg_combined_df <- load_eegdata(vps, pathlist$eeg_data_path)
   empty_row[1, ] <- NA
 
   empty_row$filename <- "P23_move_active_results.xls"
-  eeg_combined_df <- rbind(eeg_combined_df[1:(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[36]), ], 
-                           empty_row, 
-                           eeg_combined_df[(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[37]):nrow(eeg_combined_df), ])
+  eeg_combined_df <- rbind(
+    eeg_combined_df[1:(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[36]), ],
+    empty_row,
+    eeg_combined_df[(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[37]):nrow(eeg_combined_df), ]
+  )
   eeg_combined_df <- eeg_combined_df[-which(eeg_combined_df$filename == "P23_move_passive_results.xlsx")[51], ]
 }
 
@@ -79,7 +83,6 @@ testmerge <- left_join(beh_test, eeg_test,
 ) %>%
   arrange(NAME, unimodal, QUESTION, ACTIVE) %>%
   mutate(trialdiff = ntrial_beh - ntrial)
-
 ```
 
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
@@ -90,7 +93,7 @@ merge_df <- left_join(beh_combined_df, eeg_combined_df,
 
 # Compare trial counts between behavioral and EEG data
 testmerge1 <- merge_df %>%
-  group_by(NAME, QUESTION, ACTIVE, unimodal)%>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
   summarise(n = n())
 ```
 
@@ -103,27 +106,33 @@ merge_df <- merge_df %>%
   filter(!(NAME == "P23" & is.na(unimodal) & unimodal == NA & QUESTION == "m" & ACTIVE == "p" & trial_number %in% c(50))) %>%
   filter(!(NAME == "P25" & !is.na(unimodal) & unimodal == "1" & QUESTION == "m" & ACTIVE == "a" & BLOCK %in% c(1))) %>%
   # temporary filter due to unsatisfactory preprocessing
-  filter(!(NAME %in% c("P11","P17","P22") )) 
+  filter(!(NAME %in% c("P11", "P17", "P22")))
 
 testmerge2 <- merge_df %>%
-  group_by(NAME, QUESTION, ACTIVE, unimodal)%>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
   summarise(n = n())
 
 testmerge3 <- merge_df %>%
-  mutate(NAME = str_extract(NAME, "\\d+") %>% as.numeric(),
-         unimodal = case_when( unimodal %in% c("1","2") ~ 'Unimodal',
-                              !unimodal %in% c("1","2") ~ 'Self_touch')) %>%
-  group_by(NAME, QUESTION, ACTIVE, unimodal)%>%
+  mutate(
+    NAME = str_extract(NAME, "\\d+") %>% as.numeric(),
+    unimodal = case_when(
+      unimodal %in% c("1", "2") ~ "Unimodal",
+      !unimodal %in% c("1", "2") ~ "Self_touch"
+    )
+  ) %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
   summarise(n = n())
 
 ggplot(testmerge3) +
-  geom_point(aes(x=NAME, y=n, color = unimodal))+
-  facet_wrap(QUESTION~ACTIVE) +
-  scale_x_continuous(limits = c(0,25), breaks = seq(0,24,1))+
-  scale_y_continuous(limits = c(0,54), breaks = seq(0,54,by=18))+
-  labs(title = "Check for data completeness - Before Excluding Outliers",
-       x = "Participant Number",
-       y = "Number of Data")+
+  geom_point(aes(x = NAME, y = n, color = unimodal)) +
+  facet_wrap(QUESTION ~ ACTIVE) +
+  scale_x_continuous(limits = c(0, 25), breaks = seq(0, 24, 1)) +
+  scale_y_continuous(limits = c(0, 54), breaks = seq(0, 54, by = 18)) +
+  labs(
+    title = "Check for data completeness - Before Excluding Outliers",
+    x = "Participant Number",
+    y = "Number of Data"
+  ) +
   theme(
     # legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -131,7 +140,6 @@ ggplot(testmerge3) +
     axis.text = element_text(size = 12),
     axis.title = element_text(size = 18)
   )
-
 ```
 
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
@@ -139,12 +147,14 @@ ggplot(testmerge3) +
 xlsx_name <- format(Sys.time(), "BEH_EEG_Data_%d%m%Y.xlsx")
 write_xlsx(merge_df, file.path(pathlist$result_path, xlsx_name))
 
-rm(list = c("beh_combined_df", "beh_test",
-            "eeg_combined_df", "eeg_test",
-            "empty_row", 
-            "merge_df",
-            "testmerge",
-            ls(pattern = "^test")))
+rm(list = c(
+  "beh_combined_df", "beh_test",
+  "eeg_combined_df", "eeg_test",
+  "empty_row",
+  "merge_df",
+  "testmerge",
+  ls(pattern = "^test")
+))
 ```
 
 
@@ -181,15 +191,19 @@ rawData <- preprocess_beh_df(rawData) %>%
   )
 
 # Check: Are Beh Duration equal to EEG move duration?
-ggplot(rawData)+
-  geom_point(aes(x=DURATION, y=MovDur/1000), alpha=.1)+
-  labs(x="Move duration in behavioral data (s)",
-       y="Move duration in EEG data (s)")+ coord_fixed(ratio=1)
+ggplot(rawData) +
+  geom_point(aes(x = DURATION, y = MovDur / 1000), alpha = .1) +
+  labs(
+    x = "Move duration in behavioral data (s)",
+    y = "Move duration in EEG data (s)"
+  ) +
+  coord_fixed(ratio = 1)
 
 rawData %>%
-  select(sbjN, condN, BLOCK, trialN, flipped.gain, Target_length, resp, 
-         matches("^(C3|C4).*_(full|early|late)$")
-         ) %>%
+  select(
+    sbjN, condN, BLOCK, trialN, flipped.gain, Target_length, resp,
+    matches("^(C3|C4).*_(pre|full|early|late)$")
+  ) %>%
   arrange(sbjN, condN, BLOCK, trialN) %>%
   rmarkdown::paged_table(options = list(rows.print = 10, cols.print = 9))
 ```
@@ -197,20 +211,22 @@ rawData %>%
 ```{r fig.width=12, fig.height=5, echo=FALSE, warning=FALSE, message=FALSE}
 # EEG ----
 # Make long data
-rawData.filter <- filter_outliers(df = rawData %>% mutate(puffer=1%>%as.factor()),
-                                  value_col = "resp", group_cols = c("puffer")) # filter extreme Beta power values
+rawData.filter <- filter_outliers(
+  df = rawData %>% mutate(puffer = 1 %>% as.factor()),
+  value_col = "resp", group_cols = c("puffer")
+) # filter extreme response
 ggplot(rawData) +
-  geom_histogram(aes(x=resp))+
-  scale_x_continuous("Response", limits = c(0,20), breaks = seq(0,20,10)) +
+  geom_histogram(aes(x = resp)) +
+  scale_x_continuous("Response", limits = c(0, 20), breaks = seq(0, 20, 10)) +
   labs(title = "Response distribution before filtering out outliers")
 ggplot(rawData.filter) +
-  geom_histogram(aes(x=resp))+
-  scale_x_continuous("Response", limits = c(0,20), breaks = seq(0,20,10))+
+  geom_histogram(aes(x = resp)) +
+  scale_x_continuous("Response", limits = c(0, 20), breaks = seq(0, 20, 10)) +
   labs(title = "Response distribution after filtering out outliers")
 
 
 longrawData <- long_beh_eeg_df(rawData.filter)
-longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_cols = c("channellocation_timing")) # filter extreme Beta power values 
+longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_cols = c("channellocation_timing")) # filter extreme Beta power values
 
 
 shortData <- short_beh_eeg_df(longData %>% select(sbjN:powerBeta)) %>%
@@ -218,39 +234,38 @@ shortData <- short_beh_eeg_df(longData %>% select(sbjN:powerBeta)) %>%
 
 testmerge4 <- shortData %>%
   mutate(sbjN = str_extract(sbjN, "\\d+") %>% as.numeric()) %>%
-  group_by(sbjN, task, mov, unimodal)%>%
+  group_by(sbjN, task, mov, unimodal) %>%
   summarise(n = n())
 
 ggplot(testmerge4) +
-  geom_point(aes(x=sbjN, y=n, color = unimodal))+
-  facet_wrap(task~mov) +
-  scale_x_continuous(limits = c(0,25), breaks = seq(0,24,1))+
-  scale_y_continuous(limits = c(0,54), breaks = seq(0,54,by=18))+
-  labs(title = "Check for data completeness - After Excluding Outliers",
-       x = "Participant Number",
-       y = "Number of Data")
+  geom_point(aes(x = sbjN, y = n, color = unimodal)) +
+  facet_wrap(task ~ mov) +
+  scale_x_continuous(limits = c(0, 25), breaks = seq(0, 24, 1)) +
+  scale_y_continuous(limits = c(0, 54), breaks = seq(0, 54, by = 18)) +
+  labs(
+    title = "Check for data completeness - After Excluding Outliers",
+    x = "Participant Number",
+    y = "Number of Data"
+  )
+
 
 # To calculate change of Beta power
 # present data frame_ one column for C3, one column for C4
 parData <- longData %>%
   select(sbjN:delta, location, timing, powerBeta) %>%
-  pivot_wider(names_from = location, values_from = powerBeta)%>%
-  mutate(PowerDiff=C3-C4)
+  pivot_wider(names_from = location, values_from = powerBeta) %>%
+  mutate(PowerDiff = C3 - C4)
 
 byBaseline.shortData <- shortData %>%
   select(sbjN:absError, starts_with("C3"), starts_with("C4")) %>%
   rowwise() %>%
   mutate(
-    C3_movcue = 100 * (C3_movcue - C3_pre) / C3_pre,
-    C4_movcue = 100 * (C4_movcue - C4_pre) / C4_pre,
-    C3_early  = 100 * (C3_early - C3_pre)  / C3_pre,
-    C4_early  = 100 * (C4_early - C4_pre)  / C4_pre,
-    C3_half   = 100 * (C3_half - C3_pre)   / C3_pre,
-    C4_half   = 100 * (C4_half - C4_pre)   / C4_pre,
-    C3_late   = 100 * (C3_late - C3_pre)   / C3_pre,
-    C4_late   = 100 * (C4_late - C4_pre)   / C4_pre,
-    C3_post   = 100 * (C3_post - C3_pre)   / C3_pre,
-    C4_post   = 100 * (C4_post - C4_pre)   / C4_pre
+    C3_full = 100 * (C3_full - C3_pre) / C3_pre,
+    C4_full = 100 * (C4_full - C4_pre) / C4_pre,
+    C3_early = 100 * (C3_early - C3_pre) / C3_pre,
+    C4_early = 100 * (C4_early - C4_pre) / C4_pre,
+    C3_late = 100 * (C3_late - C3_pre) / C3_pre,
+    C4_late = 100 * (C4_late - C4_pre) / C4_pre
   ) %>%
   mutate(C3_pre = 0, C4_pre = 0)
 
@@ -272,8 +287,7 @@ byBaseline.longData <- byBaseline.longData %>%
 byBaseline.parData <- byBaseline.longData %>%
   select(sbjN:absError, location, timing, powerBeta) %>%
   pivot_wider(names_from = location, values_from = powerBeta) %>%
-  mutate(PowerDiff=C3-C4)
-
+  mutate(PowerDiff = C3 - C4)
 ```
 
 
@@ -309,8 +323,10 @@ H6: Negative difference in the beta power between the channels C3 and C4 [C3-C4]
 
 plotData <- parData %>% filter(unimodal == "Self-touch" & gain != "1.Unity")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = absError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = absError, color = task)
+) +
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   geom_vline(xintercept = 0, linetype = "dashed") +
@@ -320,7 +336,7 @@ ggplot(plotData,
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  facet_wrap(mov~timing, ncol=6) +
+  facet_wrap(mov ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -330,7 +346,7 @@ ggplot(plotData,
   )
 
 predictData <- parData %>%
-  filter(unimodal == "Self-touch" & gain != "1.Unity" & timing %in% c("Early Movement")) %>% 
+  filter(unimodal == "Self-touch" & gain != "1.Unity" & timing %in% c("Full Movement")) %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
@@ -341,14 +357,15 @@ summary(model)
 ```
 
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
-
 plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Active")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y =  absError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = absError, color = task)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
@@ -356,9 +373,9 @@ ggplot(plotData,
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5))+
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
   # scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol = 6) +
+  facet_wrap(gain ~ timing, nrow=2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -369,11 +386,13 @@ ggplot(plotData,
 
 plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Passive")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = absError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = absError, color = task)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Passive Conditions)",
@@ -381,9 +400,9 @@ ggplot(plotData,
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5))+
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
   # scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol=6) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -393,11 +412,11 @@ ggplot(plotData,
   )
 
 predictData <- parData %>%
-  filter(gain != "Move = Touch" & unimodal == "Self-touch"  & timing %in% c("Early Movement")) %>% 
+  filter(gain != "Move = Touch" & unimodal == "Self-touch" & timing %in% c("Full Movement")) %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
-model <- lmer(absError ~ PowerDiff * task * mov * gain+ (1 | sbjN), data = predictData)
+model <- lmer(absError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
 # View the summary of the model
 summary(model)
@@ -408,11 +427,13 @@ summary(model)
 ## signed error ----
 plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Active")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = estError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
@@ -420,9 +441,9 @@ ggplot(plotData,
     y = "Judgement Error\n(both Over and Underestimation)"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5))+
-  scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol = 6) +
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -433,11 +454,13 @@ ggplot(plotData,
 
 plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Passive")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = estError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Passive Conditions)",
@@ -445,9 +468,9 @@ ggplot(plotData,
     y = "Judgement Error\n(both Over and Underestimation)"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5))+
-  scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol=6) +
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -457,11 +480,11 @@ ggplot(plotData,
   )
 
 predictData <- parData %>%
-  filter(gain != "Move = Touch" & unimodal == "Self-touch"  & timing %in% c("Early Movement")) %>% 
+  filter(gain != "Move = Touch" & unimodal == "Self-touch" & timing %in% c("Full Movement")) %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
-model <- lmer(estError ~ PowerDiff * task * mov * gain+ (1 | sbjN), data = predictData)
+model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
 # View the summary of the model
 summary(model)
@@ -474,8 +497,10 @@ summary(model)
 
 plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & gain != "Move = Touch")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = absError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = absError, color = task)
+) +
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   geom_vline(xintercept = 0, linetype = "dashed") +
@@ -485,7 +510,7 @@ ggplot(plotData,
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  facet_wrap(mov~timing, ncol=6) +
+  facet_wrap(mov ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -495,7 +520,7 @@ ggplot(plotData,
   )
 
 predictData <- byBaseline.parData %>%
-  filter(unimodal == "Self-touch" & gain != "Move = Touch" & timing %in% c("Early Movement")) %>% 
+  filter(unimodal == "Self-touch" & gain != "Move = Touch" & timing %in% c("Full Movement")) %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
@@ -507,14 +532,15 @@ summary(model)
 
 
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
-
 plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & mov == "Active")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = estError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
@@ -522,9 +548,9 @@ ggplot(plotData,
     y = "Judgement Error\n(both Over and Underestimation)"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-755, 600))+
-  scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol=6) +
+  scale_x_continuous(limits = c(-755, 600)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -535,11 +561,13 @@ ggplot(plotData,
 
 plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & mov == "Passive")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = estError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Passive Conditions)",
@@ -547,9 +575,9 @@ ggplot(plotData,
     y = "Judgement Error\n(both Over and Underestimation)"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-755, 600))+
-  scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol=6) +
+  scale_x_continuous(limits = c(-755, 600)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -559,11 +587,11 @@ ggplot(plotData,
   )
 
 predictData <- parData %>%
-  filter(unimodal == "Self-touch"  & timing %in% c("Early Movement") & gain != "Move = Touch") %>% 
+  filter(unimodal == "Self-touch" & timing %in% c("Full Movement") & gain != "Move = Touch") %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
-model <- lmer(absError ~ PowerDiff * task * mov * gain+ (1 | sbjN), data = predictData)
+model <- lmer(absError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
 # View the summary of the model
 summary(model)
@@ -574,11 +602,13 @@ summary(model)
 ## signed error ----
 plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & mov == "Active")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = estError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
@@ -586,9 +616,9 @@ ggplot(plotData,
     y = "Judgement Error\n(both Over and Underestimation)"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-755, 600))+
-  scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol = 6) +
+  scale_x_continuous(limits = c(-755, 600)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -599,11 +629,13 @@ ggplot(plotData,
 
 plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & mov == "Passive")
 
-ggplot(plotData,
-       aes(x = PowerDiff, y = estError, color = task)) +
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_point(alpha = .05, show.legend = F)+
+  geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Passive Conditions)",
@@ -611,9 +643,9 @@ ggplot(plotData,
     y = "Judgement Error\n(both Over and Underestimation)"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-755, 600))+
-  scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain~timing, ncol=6) +
+  scale_x_continuous(limits = c(-755, 600)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -623,11 +655,11 @@ ggplot(plotData,
   )
 
 predictData <- parData %>%
-  filter(unimodal == "Self-touch"  & timing %in% c("Early Movement") & gain != "Move = Touch") %>% 
+  filter(unimodal == "Self-touch" & timing %in% c("Full Movement") & gain != "Move = Touch") %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
-model <- lmer(estError ~ PowerDiff * task * mov * gain+ (1 | sbjN), data = predictData)
+model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
 # View the summary of the model
 summary(model)
