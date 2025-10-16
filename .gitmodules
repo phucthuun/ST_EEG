@@ -1,6 +1,3 @@
-[submodule "04_Script/merge"]
-	path = 04_Script/merge
-	url = https://github.com/phucthuun/merge.git
 [submodule "04_Script/eeg"]
 	path = 04_Script/eeg
 	url = https://github.com/phucthuun/eeg.git
