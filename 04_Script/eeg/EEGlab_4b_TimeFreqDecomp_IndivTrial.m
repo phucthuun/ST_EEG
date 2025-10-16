@@ -1,10 +1,9 @@
-% Time Frequency
+% Time Frequency - EEGLAB-Based Pipeline
 % What this script does
-% 2. Time-Frequency Analysis: Computes beta-band power using FieldTrip.
+% 1. Trial Definition: Uses latency values from fixed-length EEG.epoch [-3t232 +8t228]
+% 2. Time-Frequency Analysis: Computes beta-band power on EEGLAB epochs using FieldTrip.
 % 3. Segmentation: Splits each trial into movement phases (pre, early, late, post) based on event markers.
 % Save Results: Stores beta power data and segmented averages in .mat and .xlsx files.
-% 4. Plot ERD: Generates and saves Event-Related Desynchronization plots.
-% 5. Topographic Maps: Computes and saves time-frequency topographic summaries for all electrodes.
 % ============================================================================
 
 PN_addpath()
@@ -119,16 +118,5 @@ for sub = 1%:length(fileList)
     
     disp('✅ Preprocessing and segmentation complete.');
 
-    % %% 4. Plot ERD 
-    % % See https://github.com/LaSEEB/Individualized-ERD
-    % for i_plotchannel = 1:length(anPar.channel_labels)
-    % 
-    %     channel = find(strcmp({EEG.chanlocs.labels}, anPar.channel_labels{i_plotchannel}));
-    %     [individual_erd, times, freq_range] = pop_individual_erd(EEG, channel, [13 30], 0);
-    %     plot_erd(EEG,times, mean(individual_erd,1))
-    %     output_filename = fullfile(loc.savefig, [subject_condition '_ERD' anPar.channel_labels{i_plotchannel} '.png']);
-    %     saveas(gcf, output_filename);  % Saves as PNG
-    % 
-    % end
 
 end
