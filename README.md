@@ -4,8 +4,8 @@ This repository contains the full data and scripts to reproduce all analyses and
 https://github.com/phucthuun/ST_EEG.git
 
 The **03_DataMain** folder contains data of two categories: 
-- *beh* (behavioral data): [subjectID]_[task]_[movement]_ddmmyyyyhhmm.csv
-- *eeg* (eeg data): [subjectID]_[task]_[movement].bdf
+- *beh* (behavioral data): [subjectID]__[task]_[movement]_ddmmyyyyhhmm.csv
+- *eeg* (eeg data): [subjectID]__[task]_[movement].bdf
 - 03_Robot_Randomization-list.xlsx reports abnormalities in the data during the experiment, data preprocessing, and analyses. 
 
 Note: This contains raw data and is backed-up. However, I recommend not making any change to this folder.
