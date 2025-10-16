@@ -15,9 +15,13 @@ The **04_Script** folder contains scripts for 3 categories:
 
 The **05_Result** folder contains outputs of scripts in folder **04_Script**: 
 - *eeg* (eeg data output): the result of
+  
   └── preprocessing: reformatting files to .set, ICA results, artefacts rejection with ICA
+  
   └── TF: visualization of time frequency
-  └── xlsx: average beta power in different phases
+  
+  └── xlsx: average beta power in different 
+  
       └── each folder contains result of a different strategy for the TF-analysis
      
 - *merge* (beh+eeg data output): merging two modalities and statistical analyses
