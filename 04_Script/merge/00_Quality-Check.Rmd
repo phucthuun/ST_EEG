@@ -57,7 +57,7 @@ eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "BigEpoch_OneSec
 eeg_OneSecPhase <- adjust_eeg_df(eeg_data)
 ##############################################################
 
-eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase")) 
+eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_FullPhase")) 
 # Adjustment according to protocol
 {
   empty_row <- eeg_data[1, ]
@@ -74,17 +74,26 @@ eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase")
 eeg_5Phase <- adjust_eeg_df(eeg_data)
 ###################################################
 eeg_data <- left_join(eeg_5Phase, eeg_OneSecPhase, by=c("filename", "NAME", "QUESTION", "ACTIVE", "unimodal", "trial_number")) %>%
-  mutate(MovDur.y = round(MovDur.x,2),
+  mutate(MovDur.x = round(MovDur.x,2),
          MovDur.y = round(MovDur.y/1000,2))%>%
-  mutate(movdur.diff = MovDur.x - MovDur.y, .before = MovDur.x)
+  mutate(movdur.diff = abs(MovDur.x - MovDur.y), .before = MovDur.x)
 
 ############################
 # Check movement duration
 ggplot(eeg_data)+
-  geom_point(aes(x=MovDur.x, y=round(MovDur.y/1000,2)))+
+  geom_point(aes(x=MovDur.x, y=MovDur.y))+
   labs(x="Trial-specific analysis", y="Same-length epoching")
 
+length(eeg_data$movdur.diff[eeg_data$movdur.diff<0.05])*100/nrow(eeg_data)
+
+eeg.df = eeg_data %>%
+  filter(movdur.diff<0.05) %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
+  summarise(Freq = n())
 
 
+ggplot(eeg.df, aes(x=NAME, y=Freq, fill = QUESTION))+
+  geom_col() +
+  facet_wrap(ACTIVE ~ unimodal)
 
 ```
