@@ -1,6 +1,7 @@
 # ST_EEG: Measuring Brain Activity During Self-Touch Actions
 
 This repository contains the full data and scripts to reproduce all analyses and figures 
+https://github.com/phucthuun/ST_EEG.git
 
 The **03_DataMain** folder contains data of two categories: 
 - *beh* (behavioral data): [subjectID]_[task]_[movement]_ddmmyyyyhhmm.csv
