@@ -22,7 +22,7 @@ The **05_Result** folder contains outputs of scripts in folder **04_Script**:
   
   └── xlsx: average beta power in different
 
-    └── each folder contains result of a different strategy for the TF-analysis
+      └── each folder contains result of a different strategy for the TF-analysis
      
 - *merge* (beh+eeg data output): merging two modalities and statistical analyses
 
