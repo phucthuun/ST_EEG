@@ -7,6 +7,8 @@ The **03_DataMain** folder contains data of two categories:
 - *eeg* (eeg data): [subjectID]_[task]_[movement].bdf
 - 03_Robot_Randomization-list.xlsx reports abnormalities in the data during the experiment, data preprocessing, and analyses. 
 
+Note: This contains raw data and is backed-up. However, I recommend not making any change to this folder.
+
 The **04_Script** folder contains scripts for 3 categories: 
 - *beh* (behavioral analysis)
 - *eeg* (eeg analysis): EEG preprocessing and time frequency analysis
