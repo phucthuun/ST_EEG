@@ -15,12 +15,12 @@ load_lib <- function() {
 # load paths
 load_path <- function(script_path) {
   
-  source_path <- str_extract(script_path, ".*(LR3_UCL)")
+  source_path <- str_extract(script_path, ".*(ST_EEG)")
   pathlist <- list(
     script_path = script_path,
     source_path = source_path,
     beh_data_path = file.path(source_path, "03_DataMain", "beh"),
-    eeg_data_path = file.path(source_path, "05_Result", "eeg", "xlsx", "Revise_FullPhase"),
+    eeg_data_path = file.path(source_path, "05_Result", "eeg", "xlsx", "Revise_5Phase"),
     result_path = file.path(source_path, "05_Result", "merge")
   )
   assign("pathlist", pathlist, envir = .GlobalEnv)
