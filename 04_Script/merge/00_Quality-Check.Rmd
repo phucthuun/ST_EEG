@@ -1,0 +1,86 @@
+---
+title: "TOUCH-BRAIN: Pre-Registration Plan"
+author: "Phuc TU Nguyen"
+date: "2025-06-06"
+
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    collapse: true
+---
+
+```{r setup, warning=FALSE, echo=FALSE, message=FALSE}
+## Set up libraries and define paths with function
+
+rm(list = ls())
+library(rstudioapi)
+
+script_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
+function_path <- file.path(script_path, "function")
+
+source(file.path(function_path, "loadconfig.R"))
+load_lib()
+load_path(script_path)
+load_palette()
+
+phases <- c(
+  "Movement Cue",
+  "Before Movement",
+  "During Movement",
+  "Early Movement", "Half Movement", "Late Movement", "Full Movement",
+  "After Movement"
+)
+vps <- c("P")
+```
+
+
+# Pool data {.hidden .unlisted}
+<font size="1"> Behavioral and EEG data are merged across all participants and blocks. Block number and trial number are assigned per condition (t/m &times; a/p &times; unimodal/both) </font>
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+source(file.path(function_path, "loaddata.R"))
+
+# BEH ----
+beh_combined_df <- load_behdata(vps, pathlist$beh_data_path)
+beh_combined_df <- adjust_beh_df(beh_combined_df)
+# Test for sufficient blocks
+beh_test <- beh_combined_df %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
+  summarise(ntrial_beh = n(), .groups = "drop")
+
+# EEG ----
+eeg_combined_df <- load_eegdata(vps, pathlist$eeg_data_path)
+
+# Adjustment according to protocol
+{
+  empty_row <- eeg_combined_df[1, ]
+  empty_row[1, ] <- NA
+
+  empty_row$filename <- "P23_move_active_results.xls"
+  eeg_combined_df <- rbind(
+    eeg_combined_df[1:(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[36]), ],
+    empty_row,
+    eeg_combined_df[(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[37]):nrow(eeg_combined_df), ]
+  )
+  eeg_combined_df <- eeg_combined_df[-which(eeg_combined_df$filename == "P23_move_passive_results.xlsx")[51], ]
+}
+
+
+eeg_combined_df <- adjust_eeg_df(eeg_combined_df)
+
+# Test for sufficient blocks
+eeg_test <- eeg_combined_df %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
+  summarise(ntrial = n(), .groups = "drop")
+
+# Compare trial counts between behavioral and EEG data
+testmerge <- left_join(beh_test, eeg_test,
+  by = c("NAME", "QUESTION", "ACTIVE", "unimodal")
+) %>%
+  arrange(NAME, unimodal, QUESTION, ACTIVE) %>%
+  mutate(trialdiff = ntrial_beh - ntrial)
+```
