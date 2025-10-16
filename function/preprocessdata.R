@@ -53,7 +53,7 @@ preprocess_beh_df <- function(df) {
                                 is.na(unimodal) ~ 0))
 
   df$task <- factor(df$task, levels = c("t", "m"), labels = c("Judge Touch", "Judge Movement"))
-  df$mov <- factor(df$mov, levels = c("a", "p"), labels = c("Active", "Passive")) %>% factor(levels = c("Passive", "Active"))
+  df$mov <- factor(df$mov, levels = c("p", "a"), labels = c("Passive", "Active")) 
   df$unimodal <- factor(df$unimodal, levels = c(0,1), labels = c("Self-touch", "Unimodal"))
   # df$flipped.gain <- factor(df$flipped.gain, labels = c("Target<Non-Target", "Target=Non-Target", "Target>Non-Target"))
   # df$gain <- factor(df$gain, labels = c("Move < Touch", "Move = Touch", "Move > Touch"))
