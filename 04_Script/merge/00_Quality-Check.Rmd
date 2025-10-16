@@ -27,13 +27,6 @@ load_lib()
 load_path(script_path)
 load_palette()
 
-phases <- c(
-  "Movement Cue",
-  "Before Movement",
-  "During Movement",
-  "Early Movement", "Half Movement", "Late Movement", "Full Movement",
-  "After Movement"
-)
 vps <- c("P")
 ```
 
@@ -44,43 +37,54 @@ vps <- c("P")
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
 source(file.path(function_path, "loaddata.R"))
 
-# BEH ----
-beh_combined_df <- load_behdata(vps, pathlist$beh_data_path)
-beh_combined_df <- adjust_beh_df(beh_combined_df)
-# Test for sufficient blocks
-beh_test <- beh_combined_df %>%
-  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
-  summarise(ntrial_beh = n(), .groups = "drop")
 
 # EEG ----
-eeg_combined_df <- load_eegdata(vps, pathlist$eeg_data_path)
 
+eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "BigEpoch_OneSecPhase"))
 # Adjustment according to protocol
 {
-  empty_row <- eeg_combined_df[1, ]
+  empty_row <- eeg_data[1, ]
   empty_row[1, ] <- NA
 
   empty_row$filename <- "P23_move_active_results.xls"
-  eeg_combined_df <- rbind(
-    eeg_combined_df[1:(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[36]), ],
+  eeg_data <- rbind(
+    eeg_data[1:(which(eeg_data$filename == "P23_move_active_results.xlsx")[36]), ],
     empty_row,
-    eeg_combined_df[(which(eeg_combined_df$filename == "P23_move_active_results.xlsx")[37]):nrow(eeg_combined_df), ]
+    eeg_data[(which(eeg_data$filename == "P23_move_active_results.xlsx")[37]):nrow(eeg_data), ]
   )
-  eeg_combined_df <- eeg_combined_df[-which(eeg_combined_df$filename == "P23_move_passive_results.xlsx")[51], ]
+  eeg_data <- eeg_data[-which(eeg_data$filename == "P23_move_passive_results.xlsx")[51], ]
 }
+eeg_OneSecPhase <- adjust_eeg_df(eeg_data)
+##############################################################
+
+eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase")) 
+# Adjustment according to protocol
+{
+  empty_row <- eeg_data[1, ]
+  empty_row[1, ] <- NA
+
+  empty_row$filename <- "P23_move_active_results.xls"
+  eeg_data <- rbind(
+    eeg_data[1:(which(eeg_data$filename == "P23_move_active_results.xlsx")[36]), ],
+    empty_row,
+    eeg_data[(which(eeg_data$filename == "P23_move_active_results.xlsx")[37]):nrow(eeg_data), ]
+  )
+  eeg_data <- eeg_data[-which(eeg_data$filename == "P23_move_passive_results.xlsx")[51], ]
+}
+eeg_5Phase <- adjust_eeg_df(eeg_data)
+###################################################
+eeg_data <- left_join(eeg_5Phase, eeg_OneSecPhase, by=c("filename", "NAME", "QUESTION", "ACTIVE", "unimodal", "trial_number")) %>%
+  mutate(MovDur.y = round(MovDur.x,2),
+         MovDur.y = round(MovDur.y/1000,2))%>%
+  mutate(movdur.diff = MovDur.x - MovDur.y, .before = MovDur.x)
+
+############################
+# Check movement duration
+ggplot(eeg_data)+
+  geom_point(aes(x=MovDur.x, y=round(MovDur.y/1000,2)))+
+  labs(x="Trial-specific analysis", y="Same-length epoching")
 
 
-eeg_combined_df <- adjust_eeg_df(eeg_combined_df)
 
-# Test for sufficient blocks
-eeg_test <- eeg_combined_df %>%
-  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
-  summarise(ntrial = n(), .groups = "drop")
 
-# Compare trial counts between behavioral and EEG data
-testmerge <- left_join(beh_test, eeg_test,
-  by = c("NAME", "QUESTION", "ACTIVE", "unimodal")
-) %>%
-  arrange(NAME, unimodal, QUESTION, ACTIVE) %>%
-  mutate(trialdiff = ntrial_beh - ntrial)
 ```
