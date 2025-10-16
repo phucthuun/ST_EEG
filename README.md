@@ -1,5 +1,4 @@
-# ST_EEG
-Measuring Brain Activity During Self-Touch Actions
+# ST_EEG: Measuring Brain Activity During Self-Touch Actions
 
 This repository contains the full data and scripts to reproduce all analyses and figures 
 
@@ -20,9 +19,7 @@ The **05_Result** folder contains outputs of scripts in folder **04_Script**:
   
   └── TF: visualization of time frequency
   
-  └── xlsx: average beta power in different
-
-      └── each folder contains result of a different strategy for the TF-analysis
+  └── xlsx: average beta power in different. Note: each folder contains result of a different strategy for the TF-analysis
      
 - *merge* (beh+eeg data output): merging two modalities and statistical analyses
 
