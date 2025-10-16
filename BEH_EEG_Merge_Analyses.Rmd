@@ -192,7 +192,7 @@ rawData <- preprocess_beh_df(rawData) %>%
 
 # Check: Are Beh Duration equal to EEG move duration?
 ggplot(rawData) +
-  geom_point(aes(x = DURATION, y = MovDur / 1000), alpha = .1) +
+  geom_point(aes(x = DURATION, y = MovDur), alpha = .1) +
   labs(
     x = "Move duration in behavioral data (s)",
     y = "Move duration in EEG data (s)"
