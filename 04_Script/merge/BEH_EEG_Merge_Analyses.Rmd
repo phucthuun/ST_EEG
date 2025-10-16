@@ -53,7 +53,7 @@ beh_test <- beh_combined_df %>%
   summarise(ntrial_beh = n(), .groups = "drop")
 
 # EEG ----
-eeg_combined_df <- load_eegdata(vps, pathlist$eeg_data_path)
+eeg_combined_df <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_FullPhase"))
 
 # Adjustment according to protocol
 {
@@ -357,7 +357,7 @@ summary(model)
 ```
 
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
-plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Active")
+plotData <- parData %>% filter(unimodal == "Self-touch" & gain == "2.NonUnity")
 
 ggplot(
   plotData,
@@ -368,14 +368,14 @@ ggplot(
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
+    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
     x = "Beta Power Difference: C3 - C4",
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
   scale_x_continuous(limits = c(-6.5, 5.5)) +
   # scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain ~ timing, nrow=2) +
+  facet_wrap(mov ~ timing, nrow=2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -384,7 +384,7 @@ ggplot(
     axis.title = element_text(size = 18)
   )
 
-plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Passive")
+plotData <- parData %>% filter(unimodal == "Self-touch" & gain == "1.Unity")
 
 ggplot(
   plotData,
@@ -395,14 +395,14 @@ ggplot(
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Passive Conditions)",
+    title = "Predicting Judgement Error with Difference of Beta Power (Unity conditions)",
     x = "Beta Power Difference: C3 - C4",
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
   scale_x_continuous(limits = c(-6.5, 5.5)) +
   # scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(gain ~ timing, nrow = 2) +
+  facet_wrap(mov ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
