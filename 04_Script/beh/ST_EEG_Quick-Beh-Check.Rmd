@@ -1,0 +1,219 @@
+---
+title: "ST_EEG_Analyses"
+author: "Antonio Cataldo"
+date: "2025-05-06"
+output: html_document
+---
+
+## Initialise Packages
+```{r setup, include=FALSE}
+rm(list = ls())
+library(ggplot2)
+library(tidyr)
+library(data.table)
+library(readxl)
+library(writexl)
+library(gridExtra)
+library(dplyr)
+library(broom)
+library(lme4)
+library(afex)
+library(stringr)
+```
+
+
+## Pool data
+```{r}
+setwd("C:/Data/Research/Lab_Rotation/LR3_UCL/03_DataMain/beh")
+
+
+all_files <- list.files(pattern = "*.csv")
+specific_files <- grep("P", all_files, value = TRUE)
+# Filter elements that contain neither "TRAINING" nor "unimodal"
+specific_files <- all_files[!str_detect(all_files, regex("TRAINING|unimodal", ignore_case = TRUE))]
+# Filter elements that contain "unimodal"
+# specific_files <- all_files[str_detect(all_files, regex("unimodal", ignore_case = TRUE))]
+print(specific_files)
+
+
+df_list <- list()
+
+for (file in specific_files) {
+  temp_df <- read.csv(file, header = TRUE)
+  df_list[[length(df_list) + 1]] <- temp_df[, c(1:23)]
+}
+
+combined_df <- do.call(rbind, df_list) %>%
+  filter(!(NAME == "P03" & QUESTION == "t" & ACTIVE == "p" & TIMESTAMP == "210620251705"))%>%
+  filter(!(NAME == "P17" & QUESTION == "m" & ACTIVE == "a" & TIMESTAMP == "80720251155"))%>%
+  filter(!(NAME == "P22" & QUESTION == "t" & ACTIVE == "a" & TIMESTAMP == "100720251715"))
+
+combined_df = combined_df %>% filter(NAME=="P25")
+
+```
+
+
+## Load and preprocess raw data 
+```{r}
+data <- combined_df
+
+data <- data %>%
+  rename(
+    sbjN = NAME,
+    trialN = TRIALNB,
+    task = QUESTION,
+    mov = ACTIVE
+  ) %>%
+  mutate(
+    touchLength = as.numeric(DISTANCE_TACT),
+    movLenght = as.numeric(DISTANCE_MOV),
+    gain = as.numeric(GAIN),
+    resp = as.numeric(RESPONSE)
+  )
+
+rawData <- data %>%
+  mutate(
+    Target_length = case_when(
+      task == "t" ~ touchLength,
+      task == "m" ~ movLenght
+    ),
+    condN = case_when(
+      task == "t" & mov == "a" ~ "1.Touch_Active",
+      task == "t" & mov == "p" ~ "2.Touch_Passive",
+      task == "m" & mov == "a" ~ "3.Move_Active",
+      task == "m" & mov == "p" ~ "4.Move_Passive",
+    ),
+    flipped.gain = ifelse(task == "m", gain, 1 / gain %>%
+      round(1))
+  ) %>%
+  filter(sbjN != "NAME") # ,
+#       gain != 1.25,
+#       gain != 0.8)
+
+
+rawData$task <- factor(rawData$task, levels = c("t", "m"), labels = c("Judge Touch", "Judge Movement"))
+rawData$mov <- factor(rawData$mov, levels = c("a", "p"), labels = c("Active", "Passive"))
+# rawData$gain <- factor(rawData$gain, levels = c(1.500000, 1.000000, 0.666667), labels = c("M>T", "M=T", "M<T"))
+
+
+test <- rawData %>% # Check number of trials per blk per ppt per phase
+  count(sbjN, condN)
+plot(test$n)
+```
+
+
+## Calculate means
+```{r fig.width=6.5, fig.height=6}
+aveData <- rawData %>%
+  # filter(gain != 1.25, gain != 0.8)  %>%
+  group_by(sbjN, task, mov, Target_length, gain) %>%
+  summarise(
+    response = mean(resp),
+    resp_SEM = sd(resp) / sqrt(n()),
+    n = n()
+  )
+
+wideData <- aveData %>%
+  pivot_wider(
+    names_from = c(task, mov, Target_length, gain), # Columns to use for names
+    values_from = c(response), # Values to fill in the table
+    names_sep = "_"
+  )
+# clipr::write_clip(wideData)
+
+ggplot(aveData, aes(x = Target_length, y = response, color = factor(gain), group = gain)) +
+  geom_point(stat = "summary", size = 2) +
+  geom_line(stat = "summary", size = 1, show.legend = FALSE) +
+  stat_summary(fun.data = "mean_se", geom = "ribbon", aes(fill = factor(gain)), alpha = 0.2, show.legend = FALSE) + # Ribbon with color by gain
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
+  facet_grid(task ~ mov) + # Organize by subject (rows) and hand/task/mov (columns)
+  ylim(2, 14) +
+  scale_y_continuous(breaks = seq(2, 12, by = 2)) + # Set y-axis ticks at intervals of 2
+  xlim(2, 10) +
+  labs(x = "Actual target extent (cm)", y = "Perceived target extent (cm)", color = "Gain") +
+  theme_minimal()
+```
+
+
+
+
+## Calculate Interference Coefficients
+```{r, fig.height= 4, fig.width= 7}
+w <- rawData %>%
+  # filter(gain != 1.25, gain != 0.8)  %>%
+  group_by(sbjN, mov, task) %>%
+  do({
+    model <- lm(resp ~ 0 + touchLength + movLenght, data = .)
+    as.data.frame(t(coef(model)))
+  }) %>%
+  ungroup() %>%
+  mutate(
+    normTouch = touchLength / (movLenght + touchLength),
+    normMove = movLenght / (movLenght + touchLength),
+    weights = case_when(
+      task == "Judge Touch" ~ normMove,
+      task == "Judge Movement" ~ normTouch
+    )
+  )
+
+wideW <- w %>%
+  select(-c(touchLength, movLenght, normTouch, normMove)) %>%
+  pivot_wider(
+    names_from = c(task, mov), # Columns to use for names
+    values_from = c(weights), # Values to fill in the table
+    names_sep = "_"
+  )
+# clipr::write_clip(wideW)
+
+ggplot(w, aes(x = interaction(mov, task), y = weights, fill = interaction(mov, task))) +
+  geom_bar(stat = "summary", show.legend = FALSE) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
+  # ylim(-.2, 1.2) +
+  ylim(0, 1) +
+  xlab("Condition") +
+  ylab("Weigth of task-irrelevant information (ω)")
+```
+
+
+## Calculate Interference Coefficients for each ppt
+```{r, fig.height = 4, fig.width = 10}
+sbj_w <- rawData %>%
+  # filter(gain != 1.25, gain != 0.8)  %>%
+  group_by(sbjN, mov, task) %>%
+  do({
+    model <- lm(resp ~ 0 + touchLength + movLenght, data = .)
+    as.data.frame(t(coef(model)))
+  }) %>%
+  ungroup() %>%
+  mutate(
+    normTouch = touchLength / (movLenght + touchLength),
+    normMove = movLenght / (movLenght + touchLength),
+    weights = case_when(
+      task == "Judge Touch" ~ normMove,
+      task == "Judge Movement" ~ normTouch
+    )
+  )
+
+
+ggplot(sbj_w, aes(x = interaction(mov, task), y = weights, fill = interaction(mov, task))) +
+  geom_bar(stat = "identity", position = "dodge") + # Use identity to plot computed weights
+  facet_wrap(~sbjN) + # Facet by subject
+  ylim(-0, 1) +
+  xlab("Condition") +
+  ylab("Weight of task-irrelevant information (ω)")
+```
+
+
+## Run ANOVA
+```{r}
+# full_ANOVA <- aov_ez(
+#   id = "sbjN",
+#   dv = "weights",
+#   within = c("mov", "task"),
+#   data = w,
+#   anova_table = list(correction = "GG", es = "pes")  # request partial eta squared
+# )
+#
+# # Use nice() to display the ANOVA table with effect sizes:
+# nice(full_ANOVA)
+```
