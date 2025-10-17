@@ -83,28 +83,37 @@ eeg_data <- left_join(eeg_5Phase, eeg_OneSecPhase, by=c("filename", "NAME", "QUE
 ggplot(eeg_data)+
   geom_point(aes(x=MovDur.x, y=MovDur.y))+
   labs(x="Trial-specific analysis", y="Same-length epoching")
+ggplot(eeg_data)+
+  geom_histogram(aes(x=movdur.diff))
 
+# Which participant
+eeg_data_mismatch  = eeg_data%>%
+  filter(movdur.diff>1) %>%
+  group_by(NAME, QUESTION, ACTIVE,  unimodal) %>%
+  summarise(n = n())
 ```
 
 
-## Load and preprocess raw data 
+## ????
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
 xlsx_name <- format(Sys.time(), "BEH_EEG_Data_%d%m%Y.xlsx")
 source(file.path(function_path, "preprocessdata.R"))
 # channels <- expand.grid(c("F", "Fc", "FC", "C", "CP", "P"), c("3", "5", "z", "4", "6"))
 rawData <- read_excel(path = file.path(pathlist$result_path, xlsx_name))
 rawData <- preprocess_beh_df(rawData) %>%
-  select(
-    sbjN, trialN, task, mov, unimodal, condN, BLOCK, trial_number, DURATION, MovDur, HalfDur,
-  )
-
+   select(sbjN, trialN, task, mov, unimodal, condN, BLOCK, trial_number, DURATION, MovDur, HalfDur)
 rawData$rowid = rownames(rawData) %>% as.numeric()
+ggplot(rawData)+
+  # geom_line(aes(x = rowid, y = MovDur), color = 'green')+
+  geom_line(aes(x = rowid, y = HalfDur), color = 'blue')+
+  geom_line(aes(x = rowid, y = DURATION), color = 'red')
 
 ggplot(rawData)+
-  geom_line(aes(x = rowid, y = DURATION), color = 'red')+
-  geom_line(aes(x = rowid, y = MovDur), color = 'green')+
-  geom_line(aes(x = rowid, y = HalfDur), color = 'blue')
+  geom_point(aes(x=DURATION, y=HalfDur))
 
-
+rawData = rawData %>%
+  mutate(durdiff = abs(DURATION - HalfDur))
+ggplot(rawData)+
+  geom_histogram(aes(x=durdiff), bins = 100)
+ 
 ```
-
