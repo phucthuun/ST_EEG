@@ -1,6 +1,6 @@
 % Time Frequency - EEGLAB-Based Pipeline
 % What this script does
-% 1. Trial Definition: Uses latency values from fixed-length EEG.epoch [-3t232 +8t228]
+% 1. Trial Definition: Uses latency values from fixed-length EEG.epoch [-3t232 +8t232]
 % 2. Time-Frequency Analysis: Computes beta-band power on EEGLAB epochs using FieldTrip.
 % 3. Segmentation: Splits each trial into movement phases (pre, early, late, post) based on event markers.
 % Save Results: Stores beta power data and segmented averages in .mat and .xlsx files.
