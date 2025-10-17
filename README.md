@@ -1,5 +1,7 @@
 # ST_EEG: Measuring Brain Activity During Self-Touch Actions
 
+Author: Phuc T.U. Nguyen
+
 This repository contains the full data and scripts to reproduce all analyses and figures 
 https://github.com/phucthuun/ST_EEG.git
 
