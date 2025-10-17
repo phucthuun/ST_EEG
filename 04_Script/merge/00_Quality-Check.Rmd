@@ -57,7 +57,7 @@ eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "BigEpoch_OneSec
 eeg_OneSecPhase <- adjust_eeg_df(eeg_data)
 ##############################################################
 
-eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_FullPhase")) 
+eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase")) 
 # Adjustment according to protocol
 {
   empty_row <- eeg_data[1, ]
@@ -84,16 +84,27 @@ ggplot(eeg_data)+
   geom_point(aes(x=MovDur.x, y=MovDur.y))+
   labs(x="Trial-specific analysis", y="Same-length epoching")
 
-length(eeg_data$movdur.diff[eeg_data$movdur.diff<0.05])*100/nrow(eeg_data)
-
-eeg.df = eeg_data %>%
-  filter(movdur.diff<0.05) %>%
-  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
-  summarise(Freq = n())
+```
 
 
-ggplot(eeg.df, aes(x=NAME, y=Freq, fill = QUESTION))+
-  geom_col() +
-  facet_wrap(ACTIVE ~ unimodal)
+## Load and preprocess raw data 
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+xlsx_name <- format(Sys.time(), "BEH_EEG_Data_%d%m%Y.xlsx")
+source(file.path(function_path, "preprocessdata.R"))
+# channels <- expand.grid(c("F", "Fc", "FC", "C", "CP", "P"), c("3", "5", "z", "4", "6"))
+rawData <- read_excel(path = file.path(pathlist$result_path, xlsx_name))
+rawData <- preprocess_beh_df(rawData) %>%
+  select(
+    sbjN, trialN, task, mov, unimodal, condN, BLOCK, trial_number, DURATION, MovDur, HalfDur,
+  )
+
+rawData$rowid = rownames(rawData) %>% as.numeric()
+
+ggplot(rawData)+
+  geom_line(aes(x = rowid, y = DURATION), color = 'red')+
+  geom_line(aes(x = rowid, y = MovDur), color = 'green')+
+  geom_line(aes(x = rowid, y = HalfDur), color = 'blue')
+
 
 ```
+
