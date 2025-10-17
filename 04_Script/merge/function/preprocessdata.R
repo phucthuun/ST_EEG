@@ -56,9 +56,9 @@ preprocess_beh_df <- function(df) {
   df$mov <- factor(df$mov, levels = c("p", "a"), labels = c("Passive", "Active")) 
   df$unimodal <- factor(df$unimodal, levels = c(0,1), labels = c("Self-touch", "Unimodal"))
   # df$flipped.gain <- factor(df$flipped.gain, labels = c("Target<Non-Target", "Target=Non-Target", "Target>Non-Target"))
-  # df$gain <- factor(df$gain, labels = c("Move < Touch", "Move = Touch", "Move > Touch"))
+  df$gain <- factor(df$gain, labels = c("Move < Touch", "Move = Touch", "Move > Touch"))
   df$flipped.gain <- factor(df$flipped.gain, labels = c("2.NonUnity", "1.Unity", "2.NonUnity")) %>% factor(levels = c("1.Unity", "2.NonUnity"))
-  df$gain <- factor(df$gain, labels = c("2.NonUnity", "1.Unity", "2.NonUnity")) %>% factor(levels = c("1.Unity", "2.NonUnity"))
+  # df$gain <- factor(df$gain, labels = c("2.NonUnity", "1.Unity", "2.NonUnity")) %>% factor(levels = c("1.Unity", "2.NonUnity"))
 
 
 
