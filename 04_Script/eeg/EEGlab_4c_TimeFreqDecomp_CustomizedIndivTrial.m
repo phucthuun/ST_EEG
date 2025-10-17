@@ -1,5 +1,7 @@
 % =========================================================================
-% Movement Task EEG Analysis Pipeline
+% Movement Task EEG Analysis Pipeline - FieldTrip-based Pipeline for
+% Epoching Trials of Variable Time-Length 
+% ------------------------
 % What this script does
 % 1. Trial Definition: Uses raw sample indices for onset, halfway, and offset for variable-length epochs [-1t232 +1t228]
 % 2. Time-Frequency Analysis: Computes beta-band power on FT epochs using FieldTrip.

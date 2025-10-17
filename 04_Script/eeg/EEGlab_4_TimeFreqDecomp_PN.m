@@ -1,4 +1,4 @@
-% Time Frequency
+% Time Frequency - General Idea
 % What this script does
 % 2. Time-Frequency Analysis: Computes beta-band power using FieldTrip.
 % 3. Segmentation: Splits each trial into movement phases (pre, early, late, post) based on event markers.
