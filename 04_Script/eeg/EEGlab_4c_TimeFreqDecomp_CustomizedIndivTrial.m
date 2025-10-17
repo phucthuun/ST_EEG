@@ -1,5 +1,10 @@
 % =========================================================================
 % Movement Task EEG Analysis Pipeline
+% What this script does
+% 1. Trial Definition: Uses raw sample indices for onset, halfway, and offset for variable-length epochs [-1t232 +1t228]
+% 2. Time-Frequency Analysis: Computes beta-band power on FT epochs using FieldTrip.
+% 3. Segmentation: Splits each trial into movement phases (pre, early, late, post) based on event markers.
+% Save Results: Stores beta power data and segmented averages in .mat and .xlsx files.
 % =========================================================================
 clearvars; clc; close all;
 
@@ -55,21 +60,7 @@ for sub = 1:length(fileList)
 
 
     % Time-Frequency Analysis
-    cfg = [];
-    cfg.method      = anPar.TFA.method;
-    cfg.taper       = anPar.TFA.taper;
-    cfg.output      = anPar.TFA.output;
-    cfg.foi         = anPar.TFA.foi;
-    cfg.t_ftimwin   = anPar.TFA.t_ftimwin;
-    cfg.toi         = anPar.TFA.toi;
-    cfg.pad         = anPar.TFA.pad;
-    cfg.keeptrials  = anPar.TFA.keeptrials;
-    cfg.keeptapers  = anPar.TFA.keeptapers;
-    cfg.precision   = anPar.TFA.precision;
-    cfg.channel     = anPar.channel_labels;
-    nChans          = length(cfg.channel);
-
-    freq = ft_freqanalysis(cfg, data);
+    freq = ft_freqanalysis(anPar.TFA, data);
     disp([min(freq.time), max(freq.time)]);
 
     % Extract beta power
@@ -77,7 +68,7 @@ for sub = 1:length(fileList)
     nTrials = length(freq.trialinfo);    
     nTotalTrials = size(full_trl, 1);
     
-   
+    nChans          = length(anPar.channel_labels);
     % Preallocate
     betaPower.preMov   = NaN(nTotalTrials, nChans);
     betaPower.earlyMov = NaN(nTotalTrials, nChans);
