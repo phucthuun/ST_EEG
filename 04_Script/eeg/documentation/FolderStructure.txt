@@ -1,0 +1,34 @@
+Here's a visualized structure of your EEG folder. It has to contain core structure in the ST_EEG folder:
+
+    └── ST_EEG
+        ├── 03_DataMain
+        │   └── eeg
+        │       └── EEG_Channels_Merge.xlsx
+        │       └── (all EEG files i.e., .bdf files)
+        ├── 04_Script
+        │   └── eeg
+        │       ├── EEGlab_1_QuickCheck_PN.m
+        │       ├── EEGlab_2_Preproc_Epoch_ICA_PN.m
+        │       ├── EEGlab_3_Preprocessing_SubtractIC_PN.m 
+        │       ├── EEGlab_4_TimeFreqDecomp_PN.m >>> General idea for Equal-length Epoching and post-hoc window-average, export to BigEpoch_OneSecPhase
+        │       ├── EEGlab_4b_TimeFreqDecomp_IndivTrial.m >>> EEGLAB-based Pipeline, export to Revise_FullPhases
+        │       ├── EEGlab_4c_TimeFreqDecomp_CustomizedIndivTrial.m >>> FieldTrip-based Pipeline, export to Revise_5Phases
+        │       ├── PN_addpath.m
+        │       ├── PN_EEG_0_MakeFiles.R
+        │       ├── PN_find_folderpath.m
+        │       ├── standard_1020.elc
+        │       └── function
+        │           ├── PNfun_scroll_plot.m
+        │           ├── PN_EEG_ArtifactLog.m
+        │           ├── PN_EEG_Artifact_Remove_bad_data.m
+        │           ├── PN_EEG_Artifact_runICA.m
+        │           ├── PN_EEG_Artifact_subtractICA.m
+        │           ├── PN_EEG_Import_data.m
+        │           ├── PN_EEG_Preprocessing_parameter.m
+        │           ├── PN_EEG_Preprocess_data.m
+        │           └── trialfun_movementTask.m >>> custom function tailored to epoch variable movement durations, for script 4c_
+        └── 05_Result
+            └── eeg
+                ├── preprocessing
+                ├── TF
+                └── xlsx: output of scripts 4
