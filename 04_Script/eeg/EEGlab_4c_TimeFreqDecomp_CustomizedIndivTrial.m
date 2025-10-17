@@ -28,6 +28,7 @@ fileList = fileList(arrayfun(@(f) any(startsWith(f.name, validPrefixes)), fileLi
 for sub = 1:length(fileList)
     subject_condition = erase(fileList(sub).name, '_preproc_ica_icrejct_proc.set');
     dataset_path = fullfile(loc.savePath, fileList(sub).name);
+    fprintf('File %s-----------------------------\n', subject_condition);
 
     %% 1. Import (EEG) dataset and frequency data
     % % (already epoched and preprocessed)
@@ -97,7 +98,7 @@ for sub = 1:length(fileList)
         win.postMov  = [offset, offset + 1];
 
         if win.postMov(2) > max(freq.time)
-            fprintf('postMov window exceeds available time range\n');
+            fprintf('Trial %d postMov %d window exceeds available time range\n', trialIdx, win.postMov(2));
         end
     
         for w = fieldnames(win)'
