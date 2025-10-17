@@ -53,7 +53,7 @@ beh_test <- beh_combined_df %>%
   summarise(ntrial_beh = n(), .groups = "drop")
 
 # EEG ----
-eeg_combined_df <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_FullPhase"))
+eeg_combined_df <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase"))
 
 # Adjustment according to protocol
 {
@@ -190,15 +190,6 @@ rawData <- preprocess_beh_df(rawData) %>%
     starts_with(channels)
   )
 
-# Check: Are Beh Duration equal to EEG move duration?
-ggplot(rawData) +
-  geom_point(aes(x = DURATION, y = MovDur), alpha = .1) +
-  labs(
-    x = "Move duration in behavioral data (s)",
-    y = "Move duration in EEG data (s)"
-  ) +
-  coord_fixed(ratio = 1)
-
 rawData %>%
   select(
     sbjN, condN, BLOCK, trialN, flipped.gain, Target_length, resp,
@@ -321,7 +312,7 @@ H6: Negative difference in the beta power between the channels C3 and C4 [C3-C4]
 # Raw Beta power ---------------
 ## Absolute error ----
 
-plotData <- parData %>% filter(unimodal == "Self-touch" & gain != "1.Unity")
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain != "1.Unity")
 
 ggplot(
   plotData,
@@ -330,8 +321,9 @@ ggplot(
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
   labs(
-    title = "Predicting Judgement Error with Difference of Beta Power",
+    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
     x = "Beta Power Difference: C3 - C4",
     y = "ABSOLUTE Judgement Error"
   ) +
@@ -346,7 +338,7 @@ ggplot(
   )
 
 predictData <- parData %>%
-  filter(unimodal == "Self-touch" & gain != "1.Unity" & timing %in% c("Full Movement")) %>%
+  filter(unimodal == "Self-touch" & flipped.gain != "1.Unity" & timing %in% c("Full Movement")) %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
@@ -357,7 +349,7 @@ summary(model)
 ```
 
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
-plotData <- parData %>% filter(unimodal == "Self-touch" & gain == "2.NonUnity")
+plotData <- parData %>% filter(unimodal == "Self-touch" & mov = "Active")
 
 ggplot(
   plotData,
@@ -368,14 +360,14 @@ ggplot(
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
+    title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
     x = "Beta Power Difference: C3 - C4",
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
   scale_x_continuous(limits = c(-6.5, 5.5)) +
   # scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(mov ~ timing, nrow=2) +
+  facet_wrap(gain ~ timing, nrow=2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -384,7 +376,7 @@ ggplot(
     axis.title = element_text(size = 18)
   )
 
-plotData <- parData %>% filter(unimodal == "Self-touch" & gain == "1.Unity")
+plotData <- parData %>% filter(unimodal == "Self-touch" & mov = "Passive")
 
 ggplot(
   plotData,
@@ -395,14 +387,14 @@ ggplot(
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Unity conditions)",
+    title = "Predicting Judgement Error with Difference of Beta Power (Passive conditions)",
     x = "Beta Power Difference: C3 - C4",
     y = "ABSOLUTE Judgement Error"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
   scale_x_continuous(limits = c(-6.5, 5.5)) +
   # scale_y_continuous(limits = c(-1, 2.5))+
-  facet_wrap(mov ~ timing, nrow = 2) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -412,7 +404,7 @@ ggplot(
   )
 
 predictData <- parData %>%
-  filter(gain != "Move = Touch" & unimodal == "Self-touch" & timing %in% c("Full Movement")) %>%
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing %in% c("Full Movement")) %>%
   mutate(sbjN = factor(sbjN))
 
 # Fit the linear mixed model
@@ -425,7 +417,35 @@ summary(model)
 
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
 ## signed error ----
-plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Active")
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain!="1.Unity")
+
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(alpha = .05, show.legend = F) +
+  geom_smooth(method = "lm", show.legend = T) +
+  labs(
+    title = "Will it be cancelled out? - Predicting Judgement Error with Difference of Beta Power",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error\n(both Over and Underestimation)"
+  ) +
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain~ timing, nrow = 2) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+
+
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain!="1.Unity" & mov == "Active")
 
 ggplot(
   plotData,
@@ -452,7 +472,7 @@ ggplot(
     axis.title = element_text(size = 18)
   )
 
-plotData <- parData %>% filter(unimodal == "Self-touch" & mov == "Passive")
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain!="1.Unity" & mov == "Passive")
 
 ggplot(
   plotData,
