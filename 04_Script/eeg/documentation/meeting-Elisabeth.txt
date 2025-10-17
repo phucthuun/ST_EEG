@@ -1,0 +1,29 @@
+Question for Elisabeth
+
+1. Confirm full preprocessing work flow
+	1. clean data
+	2. extract epochs
+	3. run ica on epochs - exclude eye components
+	4. artifact rejections: threshold and channels of interest
+
+
+
+2. Unit of beta power: mV^2
+
+3. Latency of beta power: for each phase
+
+4. Topography map
+- topo locations
+- specify time windows: pre, dur, post
+
+
+5. If alpha: run new script or same-script computation
+
+8. Cleaning biosemi: Blow dry electrodes after wash
+
+9. normalize beta power per participant
+baseline - move - pos
+
+(trial power)/(avg power of C3 in all exp)
+
+unit: normalized power
