@@ -79,6 +79,7 @@ for sub = 1:length(fileList)
     betaPower.lateMov  = NaN(nTotalTrials, nChans);
     betaPower.postMov  = NaN(nTotalTrials, nChans);
     MovDur = NaN(nTotalTrials, 1);
+    HalfDur = NaN(nTotalTrials, 1);
 
     t = freq.time;  % shared time axis across trials
 
@@ -114,7 +115,7 @@ for sub = 1:length(fileList)
             end
         end
     
-        MovDur(trialIdx) = offset - onset;
+        MovDur(trialIdx) = offset - onset; HalfDur(trialIdx) = offset - halfway;
     end
 
     % Create condition labels
@@ -127,8 +128,8 @@ for sub = 1:length(fileList)
     end
 
     % Save results
-    allLabels = ['MovDur', allLabels];
-    results = array2table([MovDur, betaPower.preMov, betaPower.earlyMov, betaPower.fullMov, betaPower.lateMov, betaPower.postMov]);
+    allLabels = ['MovDur', 'HalfDur',allLabels];
+    results = array2table([MovDur, HalfDur, betaPower.preMov, betaPower.earlyMov, betaPower.fullMov, betaPower.lateMov, betaPower.postMov]);
     results.Properties.VariableNames = allLabels;
 
     filename = [subject_condition '_results.xlsx']; % Input filename to save beta power data
