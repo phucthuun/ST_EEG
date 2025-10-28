@@ -36,11 +36,17 @@ vps <- c("P")
 
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
 source(file.path(function_path, "loaddata.R"))
-
+# BEH ----
+beh_combined_df <- load_behdata(vps, pathlist$beh_data_path)
+beh_combined_df <- adjust_beh_df(beh_combined_df)
+# Test for sufficient blocks
+beh_test <- beh_combined_df %>%
+  group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
+  summarise(ntrial_beh = n(), .groups = "drop")
 
 # EEG ----
 
-eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "BigEpoch_OneSecPhase"))
+eeg_data <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_FullPhase"))
 # Adjustment according to protocol
 {
   empty_row <- eeg_data[1, ]
@@ -78,19 +84,53 @@ eeg_data <- left_join(eeg_5Phase, eeg_OneSecPhase, by=c("filename", "NAME", "QUE
          MovDur.y = round(MovDur.y/1000,2))%>%
   mutate(movdur.diff = abs(MovDur.x - MovDur.y), .before = MovDur.x)
 
+merge_df <- left_join(beh_combined_df, eeg_data,
+  by = c("NAME", "QUESTION", "ACTIVE", "unimodal", "trial_number")
+)%>%
+  filter(!(NAME == "P03" & is.na(unimodal) & unimodal == NA & QUESTION == "t" & ACTIVE == "p" & BLOCK %in% c(3))) %>%
+  filter(!(NAME == "P17" & is.na(unimodal) & unimodal == NA & QUESTION == "m" & ACTIVE == "a" & BLOCK %in% c(3))) %>%
+  filter(!(NAME == "P22" & is.na(unimodal) & unimodal == NA & QUESTION == "t" & ACTIVE == "a" & BLOCK %in% c(3))) %>%
+  filter(!(NAME == "P23" & is.na(unimodal) & unimodal == NA & QUESTION == "m" & ACTIVE == "p" & trial_number %in% c(50))) %>%
+  filter(!(NAME == "P25" & !is.na(unimodal) & unimodal == "1" & QUESTION == "m" & ACTIVE == "a" & BLOCK %in% c(1))) %>%
+  # temporary filter due to unsatisfactory preprocessing
+  filter(!(NAME %in% c("P11", "P17", "P22")))
+
 ############################
 # Check movement duration
-ggplot(eeg_data)+
+ggplot(merge_df)+
   geom_point(aes(x=MovDur.x, y=MovDur.y))+
   labs(x="Trial-specific analysis", y="Same-length epoching")
-ggplot(eeg_data)+
+ggplot(merge_df)+
   geom_histogram(aes(x=movdur.diff))
 
 # Which participant
-eeg_data_mismatch  = eeg_data%>%
+eeg_data_mismatch  = merge_df%>%
+  filter(movdur.diff>1) %>%
+  select(NAME, QUESTION, ACTIVE,  unimodal, BLOCK,trial_number,movdur.diff, MovDur.x, MovDur.y)
+eeg_data_mismatch  = merge_df%>%
   filter(movdur.diff>1) %>%
   group_by(NAME, QUESTION, ACTIVE,  unimodal) %>%
-  summarise(n = n())
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+
+
+###########################
+# Check beta power correlation
+ggplot(merge_df)+
+  geom_point(aes(x=C3_early.x, C3_early.y), alpha=1, color ="blue")+
+  geom_point(aes(x=C3_late.x, C3_late.y), alpha=1, color ="green")+
+  # scale_x_continuous(limits = c(0,5))+
+  # scale_y_continuous(limits = c(0,5))+
+  theme(aspect.ratio = 1)
+
+merge_df %>%
+  select(C3_early.x, C3_early.y) %>%
+  View()
+ggplot(merge_df)+
+  geom_histogram(aes(x=C3_early.x), fill="blue",alpha=.6)+
+  geom_histogram(aes(x=C3_early.y), fill="green",alpha=.6)
+
 ```
 
 
