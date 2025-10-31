@@ -325,6 +325,70 @@ Because movement and tactile spatial percepts during self-touch are interfered b
 
 <p style="text-align: justify;">
 
+## ERD
+
+Check for ERD/S
+
+```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
+plotData <- longData %>% filter(unimodal == "Unimodal" & timing != "Full Movement")%>%
+  group_by(condN, timing, relativehemisphere, location) %>%
+  get_summary_stats(powerBeta)
+  # summarise(powerBeta=mean(powerBeta))
+
+ggplot(plotData)+
+  geom_point(aes(x=timing,y=mean,color=condN),size=3)+
+  geom_errorbar(aes(x=timing,ymin=mean-ci,ymax = mean+ci, color=condN), size=1)+
+  geom_line(aes(x=timing,y=mean,color=condN,group=condN),size=2)+
+  facet_wrap(~relativehemisphere)+
+  scale_color_manual("Condition", values = palette$three.color2)+
+  labs(
+    title = "Beta Power in unimodal conditions at contra-lateral hemisphere",
+    x = "Movement Phases",
+    # y = expression(paste("x axis ", ring(A)^2)), 
+    y = expression(paste("Averaged ", Beta, " power (", mV^2, ")"))) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.text=element_text(size= 16),
+    legend.title=element_text(size= 16)
+  )
+
+
+plotData <- byBaseline.longData %>% filter(unimodal == "Unimodal" & timing != "Full Movement")%>%
+  group_by(condN, timing, relativehemisphere, location) %>%
+  get_summary_stats(powerBeta)
+  
+ggplot(plotData)+
+  geom_point(aes(x=timing,y=mean,color=condN),size=3)+
+  geom_errorbar(aes(x=timing,ymin=mean-ci,ymax = mean+ci, color=condN), size=1)+
+  geom_line(aes(x=timing,y=mean,color=condN,group=condN),size=2)+
+  facet_wrap(~relativehemisphere)+
+  scale_color_manual("Condition", values = palette$three.color2)+
+  labs(
+    title = "Beta ERD in unimodal conditions at contra-lateral hemisphere",
+    x = "Movement Phases",
+    y = "Percentage change (%)"
+  ) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.text=element_text(size= 16),
+    legend.title=element_text(size= 16)
+  )
+  
+
+
+```
+
+
+
+
 ## Self-touch: Interhemispheric interference
 **Does the relative difference in beta power between channel C3 and C4 during self-touch explain the asymmetrical, bidirectional interference of movement and tactile spatial percepts?**
 
