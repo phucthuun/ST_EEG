@@ -2,7 +2,7 @@
 load_lib <- function() {
   packages <- c(
     "rstudioapi", "stringr", "ggplot2", "cowplot", "tidyr", "dplyr", "data.table", "tibble", "rstatix",
-    "readxl", "writexl", "gridExtra", "broom", "lme4", "afex"
+    "readxl", "writexl", "gridExtra", "broom", "lme4", "afex", "codebookr"
   )
   invisible(lapply(packages, function(pkg) {
     if (!require(pkg, character.only = TRUE)) {
@@ -19,6 +19,7 @@ load_path <- function(script_path) {
   pathlist <- list(
     script_path = script_path,
     source_path = source_path,
+    demogr_data_path = file.path(source_path, "03_DataMain"),
     beh_data_path = file.path(source_path, "03_DataMain", "beh"),
     eeg_data_path = file.path(source_path, "05_Result", "eeg", "xlsx"),
     result_path = file.path(source_path, "05_Result", "merge")
