@@ -6,3 +6,8 @@
 *.Rhistory
 *.xlsx
 *.html
+*.png
+*.docx
+*.pptx
+*.txt
+*.tmp
