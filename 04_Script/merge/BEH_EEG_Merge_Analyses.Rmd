@@ -73,6 +73,7 @@ eeg_combined_df <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5
 
 eeg_combined_df <- adjust_eeg_df(eeg_combined_df)
 
+
 # Test for sufficient blocks
 eeg_test <- eeg_combined_df %>%
   group_by(NAME, QUESTION, ACTIVE, unimodal) %>%
@@ -133,7 +134,13 @@ ggplot(testmerge3) +
     title = "Check for data completeness - Before Excluding Outliers",
     x = "Participant Number",
     y = "Number of Data"
-  ) 
+  )
+
+
+demogr_df <- read_xlsx(file.path(pathlist$demogr_data_path, "demographic.xlsx"))
+merge_df <- left_join(merge_df, demogr_df, by = "NAME")
+
+test = merge_df %>% filter(is.na(unimodal))
 ```
 
 ```{r warning=FALSE, message=FALSE, echo=FALSE}
@@ -143,6 +150,7 @@ write_xlsx(merge_df, file.path(pathlist$result_path, xlsx_name))
 # print(codebookr::codebook(rawData), file.path(pathlist$result_path,"ST_EEG_Codebook.docx"))
 
 rm(list = c(
+  "demogr_df",
   "beh_combined_df", "beh_test",
   "eeg_combined_df", "eeg_test",
   "empty_row",
@@ -181,7 +189,7 @@ options(width = 500)
 rawData <- read_excel(path = file.path(pathlist$result_path, xlsx_name))
 rawData <- preprocess_beh_df(rawData) %>%
   select(
-    sbjN, trialN, task, mov, unimodal, condN, BLOCK, trial_number, DURATION, MovDur, HalfDur,
+    sbjN, Gender, trialN, task, mov, unimodal, condN, BLOCK, trial_number, DURATION, MovDur, HalfDur,
     gain, flipped.gain, touchLength, movLength, Target_length, Interference_length, resp, estError, absError, delta,
     starts_with(channels)
   )
@@ -221,7 +229,6 @@ ggplot(rawData.filter) +
   geom_histogram(aes(x = MovDur)) +
   scale_x_continuous("Move Duration (s)", limits = c(0, 10), breaks = seq(0, 20, 10)) +
   labs(title = "Distribution of Moving Duration (excluded: more than 8s)")
-
 ```
 
 Extreme Beta power values at both end (too large or too small) are filtered out at both end. 
@@ -234,12 +241,12 @@ longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_col
 
 ggplot(longrawData) +
   geom_histogram(aes(x = powerBeta, fill = location), alpha = .5) +
-  facet_wrap(~timing)+
+  facet_wrap(~timing) +
   labs(title = "Distribution of Beta Power before filtering out outliers")
 
 ggplot(longData) +
   geom_histogram(aes(x = powerBeta, fill = location), alpha = .5) +
-  facet_wrap(~timing)+
+  facet_wrap(~timing) +
   labs(title = "Distribution of Beta Power after filtering out outliers")
 
 
@@ -249,13 +256,16 @@ shortData <- short_beh_eeg_df(longData %>% select(sbjN:powerBeta)) %>%
 testmerge4 <- shortData %>%
   mutate(sbjN = str_extract(sbjN, "\\d+") %>% as.numeric()) %>%
   group_by(sbjN, task, mov, unimodal) %>%
-  summarise(n = n())
+  summarise(n = n()) %>%
+  mutate(remain_percent = case_when(
+    unimodal == "Self-touch" ~ n / 54,
+    unimodal == "Unimodal" ~ n / 36
+  ))
 
 ggplot(testmerge4) +
   geom_point(aes(x = sbjN, y = n, color = unimodal)) +
   facet_wrap(task ~ mov) +
   scale_x_continuous(limits = c(0, 25), breaks = seq(0, 24, 1)) +
-  
   scale_y_continuous(limits = c(0, 54), breaks = seq(0, 54, by = 18)) +
   labs(
     title = "Check for data completeness - After Excluding Outliers",
@@ -302,8 +312,147 @@ byBaseline.parData <- byBaseline.longData %>%
   select(sbjN:absError, location, timing, powerBeta) %>%
   pivot_wider(names_from = location, values_from = powerBeta) %>%
   mutate(PowerDiff = C3 - C4)
+
+# rm(list = c(ls(pattern = "raw|test")))
 ```
 
+
+# Participants
+```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
+# Sex distribution
+shortData %>%
+  distinct(sbjN, Gender) %>%
+  group_by(Gender) %>%
+  summarise(n = n()) %>%
+  mutate(per = n/sum(n))%>%
+  ggplot()+
+  geom_col(aes(x=Gender, y=100*per, fill =Gender), show.legend = F)+
+  labs(title="Participant - Sex",
+       x="Sex", y="Percentage (%)")+
+  theme(aspect.ratio = 1)
+  
+```
+
+
+# Behavioral results
+
+```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
+# Subject-level aggregation
+plotData_subject <- rawData %>%
+  group_by(sbjN, task, mov, unimodal, gain, Target_length) %>%
+  summarise(response = mean(resp), .groups = "drop") %>%
+  group_by(task, mov, unimodal, gain, Target_length) %>%
+  summarise(
+    mean = mean(response),
+    se = sd(response) / sqrt(n()),  # SE across subjects
+    n = n(),
+    .groups = "drop"
+  )
+
+# Plot
+p1 = ggplot(data = plotData_subject %>% filter(unimodal == "Self-touch")) +
+  geom_point(aes(x = Target_length, y = mean, color = gain), show.legend = F) +
+  geom_line(aes(x = Target_length, y = mean, color = gain, group = gain), show.legend = F) +
+  geom_ribbon(aes(x = Target_length, ymin = mean - se, ymax = mean + se,
+                  fill = gain, group = gain), alpha = 0.15, show.legend = F) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
+  facet_grid(task ~ mov) +
+  scale_x_continuous(limits = c(2, 10), breaks = seq(4, 8, by = 2)) +
+  scale_y_continuous(breaks = seq(2, 12, by = 2)) +
+  labs(title = "Self-touch Conditions",
+       x = "Actual target extent (cm)", y = "",
+       color = "Gain", fill = "Gain") +
+  theme(
+    aspect.ratio = 1,
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
+  )
+
+p2 = ggplot(data = plotData_subject %>% filter(unimodal == "Unimodal")) +
+  geom_point(aes(x = Target_length, y = mean, color = gain), show.legend = T) +
+  geom_line(aes(x = Target_length, y = mean, color = gain, group = gain), show.legend = T) +
+  geom_ribbon(aes(x = Target_length, ymin = mean - se, ymax = mean + se,
+                  fill = gain, group = gain), alpha = 0.15, show.legend = T) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
+  facet_grid(task ~ mov, drop = T) +
+  scale_x_continuous(limits = c(2, 10), breaks = seq(4, 8, by = 2)) +
+  scale_y_continuous(breaks = seq(2, 12, by = 2)) +
+  labs(title = "Unimodal Conditions",
+       x = "Actual target extent (cm)", y = "Perceived target extent (cm)",
+       color = "Gain", fill = "Gain") +
+  theme(
+    legend.position = c(.15,.9),
+    aspect.ratio = 1,
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 16),
+    legend.key = element_blank(),
+    legend.background = element_rect(fill='transparent'),
+    legend.title = element_text(size = 16)
+  )
+
+grid.arrange(p2, p1, ncol=2)
+```
+
+## Calculate Interference Coefficients
+```{r, fig.height= 4, fig.width= 7}
+w <- rawData %>%
+  filter(unimodal=="Self-touch") %>%
+  # filter(gain != 1.25, gain != 0.8)  %>%
+  group_by(sbjN, mov, task) %>%
+  do({
+    model <- lm(resp ~ 0 + touchLength + movLength, data = .)
+    as.data.frame(t(coef(model)))
+  }) %>%
+  ungroup() %>%
+  mutate(
+    normTouch = touchLength / (movLength + touchLength),
+    normMove = movLength / (movLength + touchLength),
+    weights = case_when(
+      task == "Judge Touch" ~ normMove,
+      task == "Judge Movement" ~ normTouch
+    )
+  ) 
+
+w$mov = factor(w$mov,levels = c("Active","Passive"))
+
+wideW <- w %>%
+  select(-c(touchLength, movLength, normTouch, normMove)) %>%
+  pivot_wider(
+    names_from = c(task, mov), # Columns to use for names
+    values_from = c(weights), # Values to fill in the table
+    names_sep = "_"
+  )
+# clipr::write_clip(wideW)
+
+ggplot(w, aes(x = interaction(mov, task), y = weights, fill = interaction(mov, task))) +
+  geom_bar(stat = "summary", show.legend = FALSE) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
+  # ylim(-.2, 1.2) +
+  ylim(0, 1) +
+  xlab("Condition") +
+  ylab("Weigth of task-irrelevant information (ω)")
+```
+
+## Run ANOVA
+```{r}
+full_ANOVA <- aov_ez(
+  id = "sbjN",
+  dv = "weights",
+  within = c("mov", "task"),
+  data = w,
+  anova_table = list(correction = "GG", es = "pes")  # request partial eta squared
+)
+
+# Use nice() to display the ANOVA table with effect sizes:
+nice(full_ANOVA)
+```
 
 # Research questions
 ## Variables
@@ -330,43 +479,46 @@ Because movement and tactile spatial percepts during self-touch are interfered b
 Check for ERD/S
 
 ```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
-plotData <- longData %>% filter(unimodal == "Unimodal" & timing != "Full Movement")%>%
+plotData <- longData %>%
+  filter(unimodal == "Unimodal" & timing != "Full Movement") %>%
   group_by(condN, timing, relativehemisphere, location) %>%
   get_summary_stats(powerBeta)
-  # summarise(powerBeta=mean(powerBeta))
+# summarise(powerBeta=mean(powerBeta))
 
-ggplot(plotData)+
-  geom_point(aes(x=timing,y=mean,color=condN),size=3)+
-  geom_errorbar(aes(x=timing,ymin=mean-ci,ymax = mean+ci, color=condN), size=1)+
-  geom_line(aes(x=timing,y=mean,color=condN,group=condN),size=2)+
-  facet_wrap(~relativehemisphere)+
-  scale_color_manual("Condition", values = palette$three.color2)+
+ggplot(plotData) +
+  geom_point(aes(x = timing, y = mean, color = condN), size = 3) +
+  geom_errorbar(aes(x = timing, ymin = mean - ci, ymax = mean + ci, color = condN), size = 1) +
+  geom_line(aes(x = timing, y = mean, color = condN, group = condN), size = 2) +
+  facet_wrap(~relativehemisphere) +
+  scale_color_manual("Condition", values = palette$three.color2) +
   labs(
     title = "Beta Power in unimodal conditions at contra-lateral hemisphere",
     x = "Movement Phases",
-    # y = expression(paste("x axis ", ring(A)^2)), 
-    y = expression(paste("Averaged ", Beta, " power (", mV^2, ")"))) +
+    # y = expression(paste("x axis ", ring(A)^2)),
+    y = expression(paste("Averaged ", Beta, " power (", mV^2, ")"))
+  ) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
     plot.title = element_text(size = 19),
     axis.text = element_text(size = 18),
     axis.title = element_text(size = 18),
-    legend.text=element_text(size= 16),
-    legend.title=element_text(size= 16)
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
   )
 
 
-plotData <- byBaseline.longData %>% filter(unimodal == "Unimodal" & timing != "Full Movement")%>%
+plotData <- byBaseline.longData %>%
+  filter(unimodal == "Unimodal" & timing != "Full Movement") %>%
   group_by(condN, timing, relativehemisphere, location) %>%
   get_summary_stats(powerBeta)
-  
-ggplot(plotData)+
-  geom_point(aes(x=timing,y=mean,color=condN),size=3)+
-  geom_errorbar(aes(x=timing,ymin=mean-ci,ymax = mean+ci, color=condN), size=1)+
-  geom_line(aes(x=timing,y=mean,color=condN,group=condN),size=2)+
-  facet_wrap(~relativehemisphere)+
-  scale_color_manual("Condition", values = palette$three.color2)+
+
+ggplot(plotData) +
+  geom_point(aes(x = timing, y = mean, color = condN), size = 3) +
+  geom_errorbar(aes(x = timing, ymin = mean - ci, ymax = mean + ci, color = condN), size = 1) +
+  geom_line(aes(x = timing, y = mean, color = condN, group = condN), size = 2) +
+  facet_wrap(~relativehemisphere) +
+  scale_color_manual("Condition", values = palette$three.color2) +
   labs(
     title = "Beta ERD in unimodal conditions at contra-lateral hemisphere",
     x = "Movement Phases",
@@ -378,12 +530,9 @@ ggplot(plotData)+
     plot.title = element_text(size = 19),
     axis.text = element_text(size = 18),
     axis.title = element_text(size = 18),
-    legend.text=element_text(size= 16),
-    legend.title=element_text(size= 16)
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
   )
-  
-
-
 ```
 
 
@@ -411,8 +560,8 @@ ggplot(
   geom_smooth(method = "lm", show.legend = T) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  annotate("text", x =-.5, y = +Inf, label = sprintf('\u2190\u2190\u2190\nmotor-focused'), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12/.pt) +
-  annotate("text", x =+.5, y = +Inf, label = sprintf('\u2192\u2192\u2192\ntactile-focused'), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12/.pt) +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
     subtitle = "PowerDiff x Task x Movement type",
@@ -427,8 +576,8 @@ ggplot(
     plot.title = element_text(size = 19),
     axis.text = element_text(size = 18),
     axis.title = element_text(size = 18),
-    legend.text=element_text(size= 16),
-    legend.title=element_text(size= 16)
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
   )
 ```
 
@@ -462,8 +611,8 @@ ggplot(
   geom_smooth(method = "lm", show.legend = T) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  annotate("text", x =-.5, y = +Inf, label = sprintf('\u2190\u2190\u2190\nmotor-focused'), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12/.pt) +
-  annotate("text", x =+.5, y = +Inf, label = sprintf('\u2192\u2192\u2192\ntactile-focused'), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12/.pt) +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
   labs(
     title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
     subtitle = "PowerDiff x Task x Movement type",
@@ -495,7 +644,7 @@ summary(model)
 ```
 
 ```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain!="1.Unity")
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain != "1.Unity")
 
 ggplot(
   plotData,
@@ -503,8 +652,8 @@ ggplot(
 ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x =-.5, y = +Inf, label = sprintf('\u2190\u2190\u2190\nmotor-focused'), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12/.pt) +
-  annotate("text", x =+.5, y = +Inf, label = sprintf('\u2192\u2192\u2192\ntactile-focused'), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12/.pt) +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
@@ -516,7 +665,7 @@ ggplot(
   scale_color_manual("Task", values = palette$two.color1) +
   scale_x_continuous(limits = c(-6.5, 5.5)) +
   scale_y_continuous(limits = c(-1, 2.5)) +
-  facet_wrap(gain~ timing, nrow = 2) +
+  facet_wrap(gain ~ timing, nrow = 2) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -529,6 +678,39 @@ ggplot(
 
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
 options(width = 500)
+
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain == "2.NonUnity")
+
+ggplot(
+  plotData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
+  geom_point(alpha = .05, show.legend = F) +
+  geom_smooth(method = "lm", show.legend = T) +
+  labs(
+    title = "Predicting Judgement Error with Difference of Beta Power (A/P Conditions)",
+    subtitle = "PowerDiff x Task x Movement type x Gain",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error\n(both Over and Underestimation)"
+  ) +
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_wrap(gain ~ timing, ncol = 5) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+
+
+
 plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain == "2.NonUnity" & mov == "Active")
 
 ggplot(
@@ -537,8 +719,8 @@ ggplot(
 ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x =-.5, y = +Inf, label = sprintf('\u2190\u2190\u2190\nmotor-focused'), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12/.pt) +
-  annotate("text", x =+.5, y = +Inf, label = sprintf('\u2192\u2192\u2192\ntactile-focused'), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12/.pt) +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
@@ -567,8 +749,8 @@ ggplot(
 ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x =-.5, y = +Inf, label = sprintf('\u2190\u2190\u2190\nmotor-focused'), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12/.pt) +
-  annotate("text", x =+.5, y = +Inf, label = sprintf('\u2192\u2192\u2192\ntactile-focused'), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12/.pt) +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
@@ -588,8 +770,6 @@ ggplot(
     axis.text = element_text(size = 18),
     axis.title = element_text(size = 18)
   )
-
-
 ```
 
 Modelling Full Movement with Gains:
@@ -603,7 +783,6 @@ model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = pred
 
 # View the summary of the model
 summary(model)
-
 ```
 
 Modelling Full **Active** Movement with Gains:
@@ -617,7 +796,6 @@ model <- lmer(estError ~ PowerDiff * task * gain + (1 | sbjN), data = predictDat
 
 # View the summary of the model
 summary(model)
-
 ```
 
 
@@ -631,8 +809,8 @@ plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & flipped.gai
 ggplot(plotData, aes(x = PowerDiff, y = estError, color = task)) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  annotate("text", x =-50, y = +Inf, label = sprintf('\u2190\u2190\u2190\nmotor-focused'), color = palette$two.color1[1], hjust = 1, vjust = "top", size = 12/.pt) +
-  annotate("text", x =+50, y = +Inf, label = sprintf('\u2192\u2192\u2192\ntactile-focused'), color = palette$two.color1[2], hjust = 0, vjust = "top", size = 12/.pt) +
+  annotate("text", x = -50, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[1], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +50, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[2], hjust = 0, vjust = "top", size = 12 / .pt) +
   geom_point(alpha = .05, show.legend = F) +
   geom_smooth(method = "lm", show.legend = T) +
   labs(
@@ -652,7 +830,6 @@ ggplot(plotData, aes(x = PowerDiff, y = estError, color = task)) +
     axis.text = element_text(size = 18),
     axis.title = element_text(size = 18)
   )
-
 ```
 
 Modelling with Full Movement:
