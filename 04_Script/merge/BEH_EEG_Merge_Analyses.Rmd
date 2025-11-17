@@ -313,7 +313,7 @@ byBaseline.parData <- byBaseline.longData %>%
   pivot_wider(names_from = location, values_from = powerBeta) %>%
   mutate(PowerDiff = C3 - C4)
 
-# rm(list = c(ls(pattern = "raw|test")))
+rm(list = c(ls(pattern = "raw|test")))
 ```
 
 
@@ -338,7 +338,7 @@ shortData %>%
 
 ```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
 # Subject-level aggregation
-plotData_subject <- rawData %>%
+plotData <- shortData %>%
   group_by(sbjN, task, mov, unimodal, gain, Target_length) %>%
   summarise(response = mean(resp), .groups = "drop") %>%
   group_by(task, mov, unimodal, gain, Target_length) %>%
@@ -350,7 +350,7 @@ plotData_subject <- rawData %>%
   )
 
 # Plot
-p1 = ggplot(data = plotData_subject %>% filter(unimodal == "Self-touch")) +
+p1 = ggplot(data = plotData %>% filter(unimodal == "Self-touch")) +
   geom_point(aes(x = Target_length, y = mean, color = gain), show.legend = F) +
   geom_line(aes(x = Target_length, y = mean, color = gain, group = gain), show.legend = F) +
   geom_ribbon(aes(x = Target_length, ymin = mean - se, ymax = mean + se,
@@ -358,7 +358,7 @@ p1 = ggplot(data = plotData_subject %>% filter(unimodal == "Self-touch")) +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
   facet_grid(task ~ mov) +
   scale_x_continuous(limits = c(2, 10), breaks = seq(4, 8, by = 2)) +
-  scale_y_continuous(breaks = seq(2, 12, by = 2)) +
+  scale_y_continuous(limits = c(2, 10), breaks = seq(2, 10, by = 2)) +
   labs(title = "Self-touch Conditions",
        x = "Actual target extent (cm)", y = "",
        color = "Gain", fill = "Gain") +
@@ -372,7 +372,7 @@ p1 = ggplot(data = plotData_subject %>% filter(unimodal == "Self-touch")) +
     legend.title = element_text(size = 16)
   )
 
-p2 = ggplot(data = plotData_subject %>% filter(unimodal == "Unimodal")) +
+p2 = ggplot(data = plotData %>% filter(unimodal == "Unimodal")) +
   geom_point(aes(x = Target_length, y = mean, color = gain), show.legend = T) +
   geom_line(aes(x = Target_length, y = mean, color = gain, group = gain), show.legend = T) +
   geom_ribbon(aes(x = Target_length, ymin = mean - se, ymax = mean + se,
@@ -380,7 +380,7 @@ p2 = ggplot(data = plotData_subject %>% filter(unimodal == "Unimodal")) +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
   facet_grid(task ~ mov, drop = T) +
   scale_x_continuous(limits = c(2, 10), breaks = seq(4, 8, by = 2)) +
-  scale_y_continuous(breaks = seq(2, 12, by = 2)) +
+  scale_y_continuous(limits = c(2, 10), breaks = seq(2, 10, by = 2)) +
   labs(title = "Unimodal Conditions",
        x = "Actual target extent (cm)", y = "Perceived target extent (cm)",
        color = "Gain", fill = "Gain") +
@@ -402,7 +402,7 @@ grid.arrange(p2, p1, ncol=2)
 
 ## Calculate Interference Coefficients
 ```{r, fig.height= 4, fig.width= 7}
-w <- rawData %>%
+w <- shortData %>%
   filter(unimodal=="Self-touch") %>%
   # filter(gain != 1.25, gain != 0.8)  %>%
   group_by(sbjN, mov, task) %>%
@@ -431,13 +431,24 @@ wideW <- w %>%
   )
 # clipr::write_clip(wideW)
 
-ggplot(w, aes(x = interaction(mov, task), y = weights, fill = interaction(mov, task))) +
+ggplot(w, aes(x = mov, y = weights, fill = interaction(mov, task))) +
   geom_bar(stat = "summary", show.legend = FALSE) +
   stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
-  # ylim(-.2, 1.2) +
+  facet_wrap(~task)+
   ylim(0, 1) +
-  xlab("Condition") +
-  ylab("Weigth of task-irrelevant information (ω)")
+  labs(x="Condition",
+       y="Weigt of task-irrelevant information (ω)",
+       title = "Mean Interference Weights (ω) Across Movement and Judgment Conditions")+
+  theme(
+    aspect.ratio = 2,
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
+  )
 ```
 
 ## Run ANOVA
@@ -543,144 +554,28 @@ ggplot(plotData) +
 
 H: Negative difference in the beta power between the channels C3 and C4 [C3-C4] (i.e., stronger motor processing than tactile processing) is associated with smaller error in move judgement and smaller tactile judgement.
 
-#### Absolute Error as Dependent Variable
-
-```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
-options(width = 500)
-# Raw Beta power ---------------
-## Absolute error ----
-
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain != "1.Unity")
-
-ggplot(
-  plotData,
-  aes(x = PowerDiff, y = absError, color = task)
-) +
-  geom_point(alpha = .05, show.legend = F) +
-  geom_smooth(method = "lm", show.legend = T) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
-  labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
-    subtitle = "PowerDiff x Task x Movement type",
-    x = "Beta Power Difference: C3 - C4",
-    y = "ABSOLUTE Judgement Error"
-  ) +
-  scale_color_manual("Task", values = palette$two.color1) +
-  facet_wrap(mov ~ timing, nrow = 2) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(size = 16),
-    plot.title = element_text(size = 19),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18),
-    legend.text = element_text(size = 16),
-    legend.title = element_text(size = 16)
-  )
-```
-
-Modelling Full Movement:
-```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-predictData <- parData %>%
-  filter(unimodal == "Self-touch" & flipped.gain != "1.Unity" & timing %in% c("Full Movement")) %>%
-  mutate(sbjN = factor(sbjN))
-
-# Fit the linear mixed model
-model <- lmer(absError ~ PowerDiff * task * mov + (1 | sbjN), data = predictData)
-
-# View the summary of the model
-summary(model)
-```
-
-
 #### Signed Error as Dependent Variable
 
-```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
-options(width = 500)
-## Signed error ----
-
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain != "1.Unity")
-
-ggplot(
-  plotData,
-  aes(x = PowerDiff, y = estError, color = task)
-) +
-  geom_point(alpha = .05, show.legend = F) +
-  geom_smooth(method = "lm", show.legend = T) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
-  labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
-    subtitle = "PowerDiff x Task x Movement type",
-    x = "Beta Power Difference: C3 - C4",
-    y = "Judgement Error\n(both Over and Underestimation)"
-  ) +
-  scale_color_manual("Task", values = palette$two.color1) +
-  facet_wrap(mov ~ timing, nrow = 2) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(size = 16),
-    plot.title = element_text(size = 19),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18)
-  )
-```
-
-Modelling Full Movement:
-```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-predictData <- parData %>%
-  filter(unimodal == "Self-touch" & flipped.gain != "1.Unity" & timing %in% c("Full Movement")) %>%
-  mutate(sbjN = factor(sbjN))
-
-# Fit the linear mixed model
-model <- lmer(estError ~ PowerDiff * task * mov + (1 | sbjN), data = predictData)
-
-# View the summary of the model
-summary(model)
-```
-
-```{r fig.width=16, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE} 
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain != "1.Unity")
-
-ggplot(
-  plotData,
-  aes(x = PowerDiff, y = estError, color = task)
-) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
-  geom_point(alpha = .05, show.legend = F) +
-  geom_smooth(method = "lm", show.legend = T) +
-  labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
-    subtitle = "PowerDiff x Task x Movement type x Gain",
-    x = "Beta Power Difference: C3 - C4",
-    y = "Judgement Error\n(both Over and Underestimation)"
-  ) +
-  scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5)) +
-  scale_y_continuous(limits = c(-1, 2.5)) +
-  facet_wrap(gain ~ timing, nrow = 2) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(size = 16),
-    plot.title = element_text(size = 19),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18)
-  )
-```
-
-
+This is the wrong visualization of the right model
 ```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
 options(width = 500)
 
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain == "2.NonUnity")
+filter.timing="Full"
+predictData <- parData %>%
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing,"Movement")) %>%
+  mutate(sbjN = factor(sbjN))%>%
+  mutate( estError = (resp - Target_length) / Target_length)
 
+# Fit the linear mixed model
+model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
+
+# View the summary of the model
+summary(model)
+
+
+plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain != "1.Unity" & timing == "Full Movement")
+
+# Wrong plot!
 ggplot(
   plotData,
   aes(x = PowerDiff, y = estError, color = task)
@@ -700,7 +595,7 @@ ggplot(
   scale_color_manual("Task", values = palette$two.color1) +
   scale_x_continuous(limits = c(-6.5, 5.5)) +
   scale_y_continuous(limits = c(-1, 2.5)) +
-  facet_wrap(gain ~ timing, ncol = 5) +
+  facet_grid(gain ~ mov) +
   theme(
     legend.position = "bottom",
     strip.text = element_text(size = 16),
@@ -709,139 +604,223 @@ ggplot(
     axis.title = element_text(size = 18)
   )
 
-
-
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain == "2.NonUnity" & mov == "Active")
-
-ggplot(
-  plotData,
-  aes(x = PowerDiff, y = estError, color = task)
-) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
-  geom_point(alpha = .05, show.legend = F) +
-  geom_smooth(method = "lm", show.legend = T) +
-  labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Active Conditions)",
-    subtitle = "PowerDiff x Task x Movement type x Gain",
-    x = "Beta Power Difference: C3 - C4",
-    y = "Judgement Error\n(both Over and Underestimation)"
-  ) +
-  scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5)) +
-  scale_y_continuous(limits = c(-1, 2.5)) +
-  facet_wrap(gain ~ timing, nrow = 2) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(size = 16),
-    plot.title = element_text(size = 19),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18)
-  )
-
-plotData <- parData %>% filter(unimodal == "Self-touch" & flipped.gain == "2.NonUnity" & mov == "Passive")
-
-ggplot(
-  plotData,
-  aes(x = PowerDiff, y = estError, color = task)
-) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
-  geom_point(alpha = .05, show.legend = F) +
-  geom_smooth(method = "lm", show.legend = T) +
-  labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Passive Conditions)",
-    subtitle = "PowerDiff x Task x Movement type x Gain",
-    x = "Beta Power Difference: C3 - C4",
-    y = "Judgement Error\n(both Over and Underestimation)"
-  ) +
-  scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-6.5, 5.5)) +
-  scale_y_continuous(limits = c(-1, 2.5)) +
-  facet_wrap(gain ~ timing, nrow = 2) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(size = 16),
-    plot.title = element_text(size = 19),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18)
-  )
 ```
 
-Modelling Full Movement with Gains:
+#### Different computation of Signed Error as Dependent Variable
+
+Model 0: Does interhemispheric balance predict How accurate participants are around the target?
+
 ```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+filter.timing="Full"
 predictData <- parData %>%
-  filter(flipped.gain == "2.NonUnity" & unimodal == "Self-touch" & timing %in% c("Full Movement")) %>%
-  mutate(sbjN = factor(sbjN))
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing,"Movement")) %>%
+  mutate(sbjN = factor(sbjN))%>%
+  mutate( estError = (resp - Target_length) / Target_length)
 
 # Fit the linear mixed model
 model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
 # View the summary of the model
 summary(model)
-```
+summary_df <- as.data.frame(summary(model)$coefficients) %>% 
+ mutate_if(is.numeric, round,digits=2)%>%
+  rownames_to_column("factor")
+xlsx::write.xlsx(x=summary_df, sheetName="p0", file=file.path(pathlist$result_path,"lmer_results.xlsx"), append=TRUE)
 
-Modelling Full **Active** Movement with Gains:
-```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-predictData <- parData %>%
-  filter(flipped.gain == "2.NonUnity" & unimodal == "Self-touch" & timing %in% c("Full Movement") & mov == "Active") %>%
-  mutate(sbjN = factor(sbjN))
+# Generate predictions for PowerDiff across task, mov, and gain
+pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
 
-# Fit the linear mixed model
-model <- lmer(estError ~ PowerDiff * task * gain + (1 | sbjN), data = predictData)
-
-# View the summary of the model
-summary(model)
-```
-
-
-#### %Change in Beta Power as Predictor for Signed Error
-
-
-```{r fig.width=12, fig.height=6, echo=FALSE, warning=FALSE, message=FALSE}
-## signed error ----
-plotData <- byBaseline.parData %>% filter(unimodal == "Self-touch" & flipped.gain == "2.NonUnity" & timing == "Full Movement")
-
-ggplot(plotData, aes(x = PowerDiff, y = estError, color = task)) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
+# Plot predictions
+p0 = ggplot(pred, aes(x = x, y = predicted, color = group)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  annotate("text", x = -50, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[1], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +50, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[2], hjust = 0, vjust = "top", size = 12 / .pt) +
-  geom_point(alpha = .05, show.legend = F) +
-  geom_smooth(method = "lm", show.legend = T) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  facet_grid(panel~facet) +  # Adjust based on ggpredict output (mov × gain)
   labs(
-    title = "Predicting Judgement Error with Difference of Beta Power (Non-Unity Conditions)",
-    subtitle = "PowerDiff x Task x Movement type x Gain",
+    # title = paste("Predicting Judgement Error with Beta Power",filter.timing,"Self-touch"),
+    subtitle = "y(-1=underestimation, 0=accurate, +1=overestimation)",
     x = "Beta Power Difference: C3 - C4",
-    y = "Judgement Error\n(both Over and Underestimation)"
-  ) +
+    y = "Judgement Error"
+  )+
   scale_color_manual("Task", values = palette$two.color1) +
-  scale_x_continuous(limits = c(-755, 600)) +
-  scale_y_continuous(limits = c(-1, 2.5)) +
-  facet_wrap(gain ~ mov, ncol = 2) +
+  scale_fill_manual("Task", values = palette$two.color1) +
   theme(
+    aspect.ratio = 1,
     legend.position = "bottom",
     strip.text = element_text(size = 16),
     plot.title = element_text(size = 19),
     axis.text = element_text(size = 18),
     axis.title = element_text(size = 18)
   )
+p0
 ```
 
-Modelling with Full Movement:
-```{r fig.width=12, fig.height=12, echo=FALSE, warning=FALSE, message=FALSE}
-options(width = 500, height = 10)
+
+Model 1: Does interhemispheric balance predict if participants lean towards touch or move signal in each condition?
+
+```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+filter.timing="Full"
 predictData <- parData %>%
-  filter(unimodal == "Self-touch" & timing %in% c("Full Movement") & flipped.gain == "2.NonUnity") %>%
-  mutate(sbjN = factor(sbjN))
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing,"Movement")) %>%
+  mutate(sbjN = factor(sbjN))%>%
+  mutate(estError=(resp-touchLength)/(movLength-touchLength))
 
 # Fit the linear mixed model
 model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
 # View the summary of the model
 summary(model)
+summary_df <- as.data.frame(summary(model)$coefficients) %>% 
+ mutate_if(is.numeric, round,digits=2)%>%
+  rownames_to_column("factor")
+xlsx::write.xlsx(x=summary_df, sheetName="p1", file=file.path(pathlist$result_path,"lmer_results.xlsx"), append=TRUE)
+
+# Generate predictions for PowerDiff across task, mov, and gain
+pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
+
+# Plot predictions
+p1 = ggplot(pred, aes(x = x, y = predicted, color = group)) +
+  geom_hline(yintercept = 0, linetype = "solid", color = palette$two.color1[2]) +
+  geom_hline(yintercept = 1, linetype = "solid", color = palette$two.color1[1]) +
+  geom_hline(yintercept = .5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  facet_grid(panel~facet) +  # Adjust based on ggpredict output (mov × gain)
+  labs(
+    # title = paste("Predicting Judgement Error with Beta Power",filter.timing,"Self-touch"),
+    subtitle = "y(0=toward movement, 1=toward touch)",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error"
+  )+
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_fill_manual("Task", values = palette$two.color1) +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+p1
+```
+
+
+Model 2: Does the degree of interference depend on interhemispheric balance and which modality is magnified?
+
+```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+filter.timing="Full"
+predictData <- parData %>%
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing,"Movement")) %>%
+  mutate(sbjN = factor(sbjN))%>%
+  mutate(estError=(resp-Target_length)/(Interference_length-Target_length))
+
+# Fit the linear mixed model
+model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
+
+# View the summary of the model
+summary(model)
+summary_df <- as.data.frame(summary(model)$coefficients) %>% 
+ mutate_if(is.numeric, round,digits=2)%>%
+  rownames_to_column("factor")
+xlsx::write.xlsx(x=summary_df, sheetName="p2", file=file.path(pathlist$result_path,"lmer_results.xlsx"), append=TRUE)
+
+# Generate predictions for PowerDiff across task, mov, and gain
+pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
+
+# Plot predictions
+p2=ggplot(pred, aes(x = x, y = predicted, color = group)) +
+  geom_hline(yintercept = c(0,1), linetype = "solid") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  facet_grid(panel~facet) +  # Adjust based on ggpredict output (mov × gain)
+  labs(
+    # title = paste("Predicting Judgement Error with Beta Power",filter.timing,"Self-touch"),
+    subtitle = "y(0=toward target, 1=toward interference)",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error",
+    color = "Task",
+  )+
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_fill_manual("Task", values = palette$two.color1) +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+p2
+
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+
+Model 3: Does the degree of interference depend on whether the judged modality is smaller or larger than the interfering modality?
+
+```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+filter.timing="Full"
+predictData <- parData %>%
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing,"Movement")) %>%
+  mutate(sbjN = factor(sbjN))%>%
+  mutate(estError=(resp-Target_length)/(Interference_length-Target_length),
+         GAIN = flipped.gain)
+
+# Fit the linear mixed model
+model <- lmer(estError ~ PowerDiff * task * mov * GAIN + (1 | sbjN), data = predictData)
+
+# View the summary of the model
+summary(model)
+summary_df <- as.data.frame(summary(model)$coefficients) %>% 
+ mutate_if(is.numeric, round,digits=2)%>%
+  rownames_to_column("factor")
+
+xlsx::write.xlsx(x=summary_df, sheetName="p3", file=file.path(pathlist$result_path,"lmer_results.xlsx"), append=TRUE)
+
+# Generate predictions for PowerDiff across task, mov, and gain
+pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "GAIN"))
+
+# Plot predictions
+p3=ggplot(pred, aes(x = x, y = predicted, color = group)) +
+  geom_hline(yintercept = c(0,1), linetype = "solid") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  facet_grid(panel~facet) +  # Adjust based on ggpredict output (mov × gain)
+  labs(
+    # title = paste("Predicting Judgement Error with Beta Power",filter.timing,"Self-touch"),
+    subtitle = "y(0=toward target, 1=toward interference)",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error"
+  )+
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_fill_manual("Task", values = palette$two.color1) +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+p3
+
+grid.arrange(p0,p1, ncol=2)
+grid.arrange(p2,p3, ncol=2)
+
 ```
