@@ -768,8 +768,7 @@ grid.arrange(p1, p2, ncol=2)
 ```
 
 
-Model 3: Does the degree of interference depend on whether the judged modality is smaller or larger than the interfering modality?
-
+Model 3: Does the degree of interference depend on interhemispheric balance and whether the judged modality is smaller or larger than the interfering modality?
 ```{r fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
 filter.timing="Full"
 predictData <- parData %>%
