@@ -1,8 +1,9 @@
 # load libraties
 load_lib <- function() {
   packages <- c(
-    "rstudioapi", "stringr", "ggplot2", "cowplot", "tidyr", "dplyr", "data.table", "tibble", "rstatix",
-    "readxl", "writexl", "xlsx", "gridExtra", "broom", "lme4", "afex", "codebookr", "ggeffects"
+    "rstudioapi", "stringr", "ggplot2", "cowplot", "tidyr", "dplyr", "data.table", "tibble", "rstatix", "emmeans",
+    "readxl", "writexl", "xlsx", "gridExtra", "broom", "lme4", "afex", "codebookr", "ggeffects",
+    "performance", "effectsize", "parameters"
   )
   invisible(lapply(packages, function(pkg) {
     if (!require(pkg, character.only = TRUE)) {
