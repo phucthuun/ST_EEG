@@ -3,6 +3,7 @@
 /03_DataPilot/
 /03_DataMain/
 /05_Result/
+/05_Result/eeg
 *.Rhistory
 *.xlsx
 *.html
