@@ -19,15 +19,22 @@ library(broom)
 library(lme4)
 library(afex)
 library(stringr)
+
+library(rstudioapi)
+
+script_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
+function_path <- file.path(script_path, "function")
+
+source(file.path(function_path, "loadconfig.R"))
+load_lib()
+load_path(script_path)
+load_palette()
 ```
 
 
 ## Pool data
 ```{r}
-setwd("C:/Data/Research/Lab_Rotation/LR3_UCL/03_DataMain/beh")
-
-
-all_files <- list.files(pattern = "*.csv")
+all_files <- list.files(path = pathlist$beh_data_path, pattern = "*.csv")
 specific_files <- grep("P", all_files, value = TRUE)
 # Filter elements that contain neither "TRAINING" nor "unimodal"
 specific_files <- all_files[!str_detect(all_files, regex("TRAINING|unimodal", ignore_case = TRUE))]
@@ -39,16 +46,29 @@ print(specific_files)
 df_list <- list()
 
 for (file in specific_files) {
-  temp_df <- read.csv(file, header = TRUE)
+  temp_df <- read.csv(file.path(pathlist$beh_data_path, file), header = TRUE)
   df_list[[length(df_list) + 1]] <- temp_df[, c(1:23)]
 }
 
-combined_df <- do.call(rbind, df_list) %>%
-  filter(!(NAME == "P03" & QUESTION == "t" & ACTIVE == "p" & TIMESTAMP == "210620251705"))%>%
-  filter(!(NAME == "P17" & QUESTION == "m" & ACTIVE == "a" & TIMESTAMP == "80720251155"))%>%
-  filter(!(NAME == "P22" & QUESTION == "t" & ACTIVE == "a" & TIMESTAMP == "100720251715"))
+combined_df <- do.call(rbind, df_list) %>%   filter(NAME != "NAME")
+# combined_df <- combined_df %>%
+#     # Assign BLOCK number based on TIMESTAMP within each group
+#     group_by(NAME, QUESTION, ACTIVE) %>%
+#     mutate(
+#       BLOCK = as.integer(factor(TIMESTAMP, levels = unique(TIMESTAMP))),
+#       .before = GAIN
+#     ) %>%
+#     ungroup() %>%
+#   filter(!(NAME == "P03"  & QUESTION == "t" & ACTIVE == "p" & BLOCK %in% c(3))) %>%
+#   filter(!(NAME == "P17"  & QUESTION == "m" & ACTIVE == "a" & BLOCK %in% c(3))) %>%
+#   filter(!(NAME == "P22"  & QUESTION == "t" & ACTIVE == "a" & BLOCK %in% c(3))) %>%
+#   filter(!(NAME == "P23"  & QUESTION == "m" & ACTIVE == "p" & BLOCK %in% c(3) & TRIALNB %in% c(13))) %>%
+#   # temporary filter due to unsatisfactory preprocessing
+#   filter(!(NAME %in% c("P11", "P17", "P22")))
 
-combined_df = combined_df %>% filter(NAME=="P25")
+testmerge2 <- combined_df %>%
+  group_by(NAME, QUESTION, ACTIVE) %>%
+  summarise(n = n())
 
 ```
 
@@ -97,8 +117,16 @@ rawData$mov <- factor(rawData$mov, levels = c("a", "p"), labels = c("Active", "P
 
 
 test <- rawData %>% # Check number of trials per blk per ppt per phase
-  count(sbjN, condN)
-plot(test$n)
+  count(sbjN, condN)%>%
+  mutate(sbjN=as.factor(sbjN))
+ggplot(test) +
+  geom_point(aes(x = sbjN, y = n)) +
+  facet_wrap( ~ condN) +
+  labs(
+    title = "Check for data completeness - Before Excluding Outliers",
+    x = "Participant Number",
+    y = "Number of Data"
+  )
 ```
 
 
@@ -127,10 +155,10 @@ ggplot(aveData, aes(x = Target_length, y = response, color = factor(gain), group
   stat_summary(fun.data = "mean_se", geom = "ribbon", aes(fill = factor(gain)), alpha = 0.2, show.legend = FALSE) + # Ribbon with color by gain
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
   facet_grid(task ~ mov) + # Organize by subject (rows) and hand/task/mov (columns)
-  ylim(2, 14) +
-  scale_y_continuous(breaks = seq(2, 12, by = 2)) + # Set y-axis ticks at intervals of 2
-  xlim(2, 10) +
+  scale_x_continuous(limits = c(2,10),breaks = seq(4, 8, by = 2)) +
+  scale_y_continuous(breaks = seq(2, 12, by = 2)) +
   labs(x = "Actual target extent (cm)", y = "Perceived target extent (cm)", color = "Gain") +
+  theme(aspect.ratio = 1)
   theme_minimal()
 ```
 
@@ -206,14 +234,14 @@ ggplot(sbj_w, aes(x = interaction(mov, task), y = weights, fill = interaction(mo
 
 ## Run ANOVA
 ```{r}
-# full_ANOVA <- aov_ez(
-#   id = "sbjN",
-#   dv = "weights",
-#   within = c("mov", "task"),
-#   data = w,
-#   anova_table = list(correction = "GG", es = "pes")  # request partial eta squared
-# )
-#
-# # Use nice() to display the ANOVA table with effect sizes:
-# nice(full_ANOVA)
+full_ANOVA <- aov_ez(
+  id = "sbjN",
+  dv = "weights",
+  within = c("mov", "task"),
+  data = w,
+  anova_table = list(correction = "GG", es = "pes")  # request partial eta squared
+)
+
+# Use nice() to display the ANOVA table with effect sizes:
+nice(full_ANOVA)
 ```
