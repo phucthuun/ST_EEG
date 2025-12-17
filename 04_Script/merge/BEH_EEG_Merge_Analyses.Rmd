@@ -574,6 +574,19 @@ predictData <- parData %>%
     GAIN = flipped.gain
   )
 
+# CODING APPROACH 1: DUMMY CODING
+# 1. Set Passive as the Reference
+# Assuming "Passive" is the first (reference) level 
+predictData$mov <- relevel(predictData$mov, ref = "Passive")
+contrasts(predictData$mov) <- contr.treatment(2) 
+
+# 2. Set Touch as reference
+contrasts(predictData$task) <- contr.treatment(2) 
+
+# 3. Set Gain contr.treatment(2) 
+predictData$gain <- factor(predictData$gain, levels = c("Move < Touch", "Move > Touch"))
+contrasts(predictData$gain) <- contr.treatment(2) 
+
 # Fit the linear mixed model
 model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
 
@@ -582,8 +595,8 @@ summary(model)
 summary_df <- as.data.frame(summary(model)$coefficients) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   rownames_to_column("factor")
-xlsx::write.xlsx(x = summary_df %>% 
-                   mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))), 
+xlsx::write.xlsx(x = summary_df %>%
+                   mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
                  sheetName = "p0_lmer", file = file.path(pathlist$result_path, "lmer_results.xlsx"), append = TRUE)
 
 # Generate predictions for PowerDiff across task, mov, and gain
@@ -642,3 +655,122 @@ css$emtrends
 
 ```
 
+
+*Research Question: In the condition $\text{Judge Movement}:\text{Passive}:\text{Move > Touch}$, is the predicted estimation error ($\text{estError}$) equal to zero when the neural predictor ($\text{PowerDiff}$) is exactly zero?*
+
+- The Statistical Test: Contrasting the Estimated Marginal Mean (EMM) against Zero
+
+- The $\text{emmeans}$ function can calculate the predicted mean of the dependent variable ($\text{estError}$) for any specific combination of factors, holding continuous predictors (like $\text{PowerDiff}$) at a specific value (e.g., zero).
+
+
+```{r Against 0, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# Step 1: Calculate the EMM at $\text{PowerDiff} = 0$
+# 1. Define the specific condition of interest
+condition_of_interest <- c(task = "Judge Movement", mov = "Passive", gain = "Move > Touch")
+
+# 2. Use emmeans to find the predicted estError when PowerDiff is 0
+emm_at_zero <- emmeans(model, specs = ~ task * mov * gain, 
+                       at = list(PowerDiff = 0))
+summary(emm_at_zero)
+
+# 3. Filter the result to just your condition
+emm_specific <- summary(emm_at_zero) %>% 
+  filter(task == "Judge Movement", mov == "Passive", gain == "Move > Touch")
+
+# Step 2: Test the Hypothesis ($\text{Estimate} = 0$)
+# Test the specific estimate against zero
+test_result <- contrast(emm_at_zero, method = "revpairwise", 
+                        by = "task", adjust = "none") # Use adjust="none" or "Tukey" as needed
+                        
+# Filter the contrast output for the test: "Estimate vs. 0"
+# (Note: Often, if the CI from Step 1 does not include zero, the test is redundant)
+```
+
+The most important finding here is which conditions are not biased when the neural predictor is neutral. This demonstrates where the behavioral effects of $\text{task}$, $\text{mov}$, and $\text{gain}$ effectively cancel each other out:
+
+- Four conditions show NO significant bias at symmetrical processing ($\text{PowerDiff}=0$). This is quite powerful, as it suggests the behavioral effects of the sensory context are not a sufficient explanation for bias in these cases; the bias must be driven by the neural modulation ($\text{PowerDiff}$ interaction).
+
+- Four conditions do show a significant bias, meaning the combined effects of $\text{task}$, $\text{mov}$, and $\text{gain}$ create an inherent bias that the neural state must counteract or enhance.
+
+
+
+### Model 0.1: New coding scheme
+
+We assume that judging touch and judging movement are equivalent tasks, as well as no effect of modality on gain. Therefore, we apply for a mixed coding approach that kept the dummy coding of movement type (i.e., Passive condition as reference level) and sum-coded task (Judge Touch vs Judge Movement) and gain. 
+
+```{r Model 0, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+filter.timing <- "Full"
+predictData <- parData %>%
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing, "Movement")) %>%
+  mutate(sbjN = factor(sbjN)) %>%
+  mutate(
+    estError = (resp - Target_length) / Target_length,
+    GAIN = flipped.gain
+  )
+
+
+# CODING APPROACH 1: MIXED CODING APPROACH
+# 1. Set Passive as the Reference (Dummy Coding)
+# Assuming "Passive" is the first level alphabetically; if not, use relevel()
+predictData$mov <- relevel(predictData$mov, ref = "Passive")
+contrasts(predictData$mov) <- contr.treatment(2) 
+
+# 2. Set Touch vs Move as Sum Coding (Effect Coding)
+contrasts(predictData$task) <- contr.sum(2)
+
+# 3. Set Gain as Sum Coding (Effect Coding)
+predictData$gain <- factor(predictData$gain, levels = c("Move < Touch", "Move > Touch"))
+contrasts(predictData$gain) <- contr.sum(2)
+
+# Fit the linear mixed model
+model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
+
+# View the summary of the model
+summary(model)
+summary_df <- as.data.frame(summary(model)$coefficients) %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  rownames_to_column("factor")
+# xlsx::write.xlsx(x = summary_df %>%
+#                    mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
+#                  sheetName = "p0_lmer", file = file.path(pathlist$result_path, "lmer_results_mixed.xlsx"), append = TRUE)
+
+# Generate predictions for PowerDiff across task, mov, and gain
+pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
+
+# Plot predictions
+p0 <- ggplot(pred, aes(x = x, y = predicted, color = group)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
+  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  facet_grid(panel ~ facet) + # Adjust based on ggpredict output (mov × gain)
+  labs(
+    title = paste("Predicting Judgement Error with Beta Power during",filter.timing,"Self-touch"),
+    subtitle = "PowerDiff * Task * Movement type * Gain",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error\n(-1 = underestimation, 0 = accurate, +1 =overestimation)\n"
+  ) +
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_fill_manual("Task", values = palette$two.color1) +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    panel.spacing = unit(1, "lines"),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+p0
+
+anova(model)
+# xlsx::write.xlsx(
+#   x = anova(model) %>% round(3) %>%
+#     mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
+#   sheetName = "p0_anova",
+#   file = file.path(pathlist$result_path, "lmer_results_mixed.xlsx"), append = TRUE
+# )
+
+```
