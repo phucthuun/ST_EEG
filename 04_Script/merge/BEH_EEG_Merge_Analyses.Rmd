@@ -602,6 +602,34 @@ xlsx::write.xlsx(x = summary_df %>%
 # Generate predictions for PowerDiff across task, mov, and gain
 pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
 
+# Comment PHUC: Wrong plot? Does geom_smooth lm does the same thing as lmer()?
+ggplot(
+  predictData,
+  aes(x = PowerDiff, y = estError, color = task)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(alpha = .05, show.legend = F) +
+  geom_smooth(method = "lm", show.legend = T) + 
+  labs(
+    title = "Predicting Judgement Error with Difference of Beta Power",
+    x = "Beta Power Difference: C3 - C4",
+    y = "Judgement Error\n(both Over and Underestimation)"
+  ) +
+  scale_color_manual("Task", values = palette$two.color1) +
+  scale_x_continuous(limits = c(-6.5, 5.5)) +
+  scale_y_continuous(limits = c(-1, 2.5)) +
+  facet_grid(gain ~ mov) +
+  theme(
+    aspect.ratio = 1,
+    legend.position = "bottom",
+    strip.text = element_text(size = 16),
+    panel.spacing = unit(1, "lines"),
+    plot.title = element_text(size = 19),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18)
+  )
+
 # Plot predictions
 p0 <- ggplot(pred, aes(x = x, y = predicted, color = group)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
