@@ -9,8 +9,10 @@ function [trl, event] = trialfun_movementTask(cfg)
 % Trial definition:
 %   - Each trial starts 1s before trigger 232 and ends 1s after trigger 228.
 %   - Only the first 232 trigger per epoch is used.
-%   - Trials are marked valid if they fall within the original epoch window
-%     (-3s to +8s around trigger 232).
+%   - Trials are marked valid if 
+%       (1) they fall within the original epoch window (-3s to +8s around trigger 232).
+%       (2) Movement duration (232 to 228) is smaller than 7s (enought time
+%       for post-movement)
 %
 % Output:
 %   - trl: Nx7 matrix with trial sample indices and metadata
@@ -79,11 +81,11 @@ for e = validEpochs
     endsample = offset_sample + round(cfg.trialdef.post * hdr.Fs); % 1s after offset
     offset    = -round(cfg.trialdef.pre * hdr.Fs);                 % Relative to onset
 
-    %% Check validity: trial onset and movement offset must fit within original epoch window (-3s to +8s)
-    isValid = begsample >= onset_sample - round(3 * hdr.Fs) && ...
-              offset_sample <= onset_sample + round(8 * hdr.Fs); 
-              % if more conservative and include post-movement: endsample <= onset_sample + round(8 * hdr.Fs);
-
+    % Define the half-window buffer required by the Hanning taper (400ms / 2)
+    hanning_buffer = round(0.2 * hdr.Fs);
+    %% Check validity: pre-movement and post-movement must fit within original epoch window (-3s to +8s)
+    isValid = (begsample) >= (onset_sample - round(3 * hdr.Fs)) && ... % pre-mov  is after -3s movement onset
+              (endsample + hanning_buffer) <= (onset_sample + round(8 * hdr.Fs));       % post-mov is before +8s movement onset
     if ~isValid
         fprintf('Skipping epoch %d: trial [%d %d] out of bounds\n', e, begsample, endsample);
     end

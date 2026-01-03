@@ -118,22 +118,53 @@ for sub = 1:length(fileList)
         MovDur(trialIdx) = offset - onset; HalfDur(trialIdx) = offset - halfway;
     end
 
-    % Create condition labels
-    timeLabels = {'pre', 'early', 'full', 'late', 'post'};
-    allLabels = {};
-    for tl = 1:length(timeLabels)
-        for cc = 1:length(anPar.channel_labels)
-            allLabels = [allLabels, [anPar.channel_labels{cc}, '_', timeLabels{tl}]];
+    %% Classification of Exclusions
+    % Valid = Valid Trial (Data present)
+    % Timing_Reject = Timing/Boundary Exclusion (from 7s/8s trialfun check)
+    % Baseline_Reject = Baseline/Preproc Exclusion from script 3 (missing from .set file, likely 120uV rejection)
+    
+    %% Classification of Exclusions (Character-based)
+    % Initialize all as 'Baseline_Reject' (Default)
+    %% [Existing Classification Logic Here]
+    ExclCode = repmat({'Baseline_Reject'}, nTotalTrials, 1); 
+    for i = 1:nTotalTrials
+        if full_trl(i, end) == 0
+            ExclCode{i} = 'Timing_Reject'; 
+        end
+    end
+    for iValid = 1:length(validTrialIndices)
+        trialIdx = validTrialIndices(iValid);
+        if ~isnan(MovDur(trialIdx))
+            ExclCode{trialIdx} = 'Valid'; 
         end
     end
 
-    % Save results
-    allLabels = ['MovDur', 'HalfDur',allLabels];
-    results = array2table([MovDur, HalfDur, betaPower.preMov, betaPower.earlyMov, betaPower.fullMov, betaPower.lateMov, betaPower.postMov]);
-    results.Properties.VariableNames = allLabels;
+    %% Save results
+    % 1. Create headers for the beta channels
+    betaLabels = {};
+    timeLabels = {'pre', 'early', 'full', 'late', 'post'};
+    for tl = 1:length(timeLabels)
+        for cc = 1:length(anPar.channel_labels)
+            betaLabels = [betaLabels, [anPar.channel_labels{cc}, '_', timeLabels{tl}]];
+        end
+    end
 
-    filename = [subject_condition '_results.xlsx']; % Input filename to save beta power data
-    writetable(results, fullfile(loc.saveXLSX, "Revise_5Phase", filename)); 
+    % 2. Build the numeric portion of the table
+    numericData = [MovDur, HalfDur, betaPower.preMov, betaPower.earlyMov, ...
+                   betaPower.fullMov, betaPower.lateMov, betaPower.postMov];
+    results = array2table(numericData);
+    
+    % 3. Insert the character column at the correct position
+    results.ExclCode = ExclCode;
+    
+    % 4. Name the columns (reordering so ExclCode is the 3rd column)
+    results = results(:, [1, 2, end, 3:end-1]); 
+    results.Properties.VariableNames = ['MovDur', 'HalfDur', 'ExclCode', betaLabels];
+
+    % 5. Write to file
+    filename = [subject_condition '_results.xlsx'];
+    writetable(results, fullfile(loc.saveXLSX, "Revise_5Phase_Strict7s", filename));
+    fprintf('Saved %s\n', filename);
 
 end
 
