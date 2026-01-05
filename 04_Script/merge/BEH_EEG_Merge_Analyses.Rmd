@@ -8,7 +8,7 @@ output:
     theme: flatly       
     highlight: tango     # Nice syntax highlighting for R code
     toc: true
-    toc_depth: 3
+    toc_depth: 4
     toc_float: 
       collapsed: false   # Keeps the TOC expanded
       smooth_scroll: true
@@ -30,6 +30,8 @@ source(file.path(function_path, "loadconfig.R"))
 load_lib()
 load_path(script_path)
 load_palette()
+
+script_time <- format(Sys.time(), ("%d%m%Y_%H%M"))
 
 phases <- c(
   "Movement Cue",
@@ -60,7 +62,7 @@ beh_test <- beh_combined_df %>%
 ```
 
 ```{r Pool eeg, warning=FALSE, message=FALSE, echo=FALSE}
-eeg_combined_df <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase_Strict7s"))
+eeg_combined_df <- load_eegdata(vps, file.path(pathlist$eeg_data_path, "Revise_5Phase"))
 
 # Adjustment according to protocol
 {
@@ -205,7 +207,7 @@ rawData <- preprocess_beh_df(rawData) %>%
   select(
     sbjN, Gender, trialN, task, mov, unimodal, condN, BLOCK, trial_number, DURATION, MovDur, HalfDur,
     gain, flipped.gain, touchLength, movLength, Target_length, Interference_length, resp, estError, absError, delta,
-    ExclCode,
+    # ExclCode,
     starts_with(channels)
   )
 
@@ -222,6 +224,8 @@ rawData %>%
 # Removing outliers
 
 Idea: Extreme slow or quick movement could be excluded because participants pressed arrows too quick and submitted responses immediately.
+
+## Beh: Movement duration
 
 ```{r Filter abnormal movement, fig.width=12, fig.height=5, echo=TRUE, warning=FALSE, message=FALSE}
 # Calculate IQR boundaries for MovDur
@@ -251,7 +255,7 @@ cat(sprintf(
 # Which participants have missing MovDur
 (rawData %>%
   filter(is.na(MovDur)) %>%
-  count(sbjN, condN, ExclCode))
+  count(sbjN, condN))
 
 rawData <- rawData %>%
   filter(!is.na(MovDur))
@@ -265,6 +269,7 @@ p1
 ```
 
 
+## Beh: Extreme Responses
 
 Extreme responses at both end (too large or too small estimation) are excluded because participants pressed arrows too quick and submitted responses immediately.
 
@@ -278,7 +283,7 @@ filter.choice <- list(
 
 rawData.filter <- filter_outliers(
   df = rawData %>% mutate(puffer = 1 %>% as.factor()),
-  value_col = "estError", group_cols = filter.choice[[2]]
+  value_col = "estError", group_cols = filter.choice[[1]]
 ) # filter extreme response
 ggplot(rawData) +
   geom_histogram(aes(x = 100 * estError)) +
@@ -300,37 +305,43 @@ cat(sprintf(
 
 # Identify which conditions are losing the most data
 (loss_report <- rawData %>%
-  anti_join(rawData.filter, by = c("sbjN","condN", "BLOCK","trial_number")) %>%
+  anti_join(rawData.filter, by = c("sbjN", "condN", "BLOCK", "trial_number")) %>%
   count(condN, name = "excluded_count"))
+
 ```
+
+
+## EEG: Extreme Beta power values
 
 Extreme Beta power values at both end (too large or too small) are filtered out at both end. 
 
-**Idea: (1) Filter out the extreme large values. (2) Log transform for skewed data**
+**Idea: (1) Filter out the extreme raw values. (2) Filter out the extreme raw values + Log transform for skewed data**. In this case, we went for the `r ifelse(power.type == "raw","first","second")` method.
 
 ```{r Filter extreme beta power values, fig.width=12, fig.height=5, echo=FALSE, warning=FALSE, message=FALSE}
 filter.choice <- list(
   "puffer", # extreme responses across all participants
   "sbjN", # extreme responses of each participant
-  c("sbjN", "channellocation_timing") # filter extreme Beta power values by participant and electrode position and timing
+  c("sbjN", "channellocation_timing"), # filter extreme Beta power values by participant and electrode position and timing
+  "channellocation_timing"
 )
 longrawData <- long_beh_eeg_df(rawData.filter)
 
 # raw data require filtering outliers
-longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_cols = filter.choice[[3]])
-
+longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_cols = filter.choice[[4]])
+# # Or log-transform
+# longData <- longrawData
 
 ggplot(longrawData) +
-  geom_histogram(aes(x = powerBeta, fill = location), alpha = .5) +
+  geom_histogram(aes(x = powerBeta, fill = location), alpha = .5, position = "identity") +
   facet_wrap(~timing) +
-  scale_x_continuous(expression(paste("Beta Power", " power (", mV^2, ")"))) +
-  scale_y_continuous(limits = c(0, 2000)) +
+  scale_x_continuous(expression(paste("Beta Power (", mV^2, ")"))) +
+  # scale_y_continuous(limits = c(0, 2000)) +
   labs(title = "Distribution of Raw Beta Power before filtering out outliers")
 ggplot(longData) +
-  geom_histogram(aes(x = powerBeta, fill = location), alpha = .5) +
+  geom_histogram(aes(x = powerBeta, fill = location), alpha = .5, position = "identity") +
   facet_wrap(~timing) +
   scale_x_continuous(expression(paste("Beta Power", " power (", mV^2, ")"))) +
-  scale_y_continuous(limits = c(0, 2000)) +
+  # scale_y_continuous(limits = c(0, 2000)) +
   labs(title = "Distribution of Raw Beta Power after filtering out outliers")
 
 if (power.type == "log") {
@@ -338,43 +349,22 @@ if (power.type == "log") {
     mutate(across(starts_with(c("powerBeta")), ~ 10 * log10(.x))) # log-transformation
 
   ggplot(longData) +
-  geom_histogram(aes(x = powerBeta, fill = location), alpha = .5) +
-  facet_wrap(~timing) +
-  scale_x_continuous(expression(paste("Beta Power (dB)"))) +
-  scale_y_continuous(limits = c(0, 2000)) +
-  labs(title = "Distribution of Log-Transformed Beta Power after filtering out outliers")
-  }
-
+    geom_histogram(aes(x = powerBeta, fill = location), alpha = .5, position = "identity") +
+    facet_wrap(~timing) +
+    scale_x_continuous(expression(paste("Beta Power (dB)"))) +
+    # scale_y_continuous(limits = c(0, 2000)) +
+    labs(title = "Distribution of Log-Transformed Beta Power after filtering out outliers")
+}
 
 
 shortData <- short_beh_eeg_df(longData %>% select(sbjN:powerBeta)) %>%
   mutate(unimodal = as.factor(unimodal))
 
-testmerge4 <- shortData %>%
-  mutate(sbjN = str_extract(sbjN, "\\d+") %>% as.numeric()) %>%
-  group_by(sbjN, task, mov, unimodal) %>%
-  summarise(n = n()) %>%
-  mutate(remain_percent = case_when(
-    unimodal == "Self-touch" ~ n / 54,
-    unimodal == "Unimodal" ~ n / 36
-  ))
-
-ggplot(testmerge4) +
-  geom_point(aes(x = sbjN, y = n, color = unimodal)) +
-  facet_wrap(task ~ mov) +
-  scale_x_continuous(limits = c(0, 25), breaks = seq(0, 24, 1)) +
-  scale_y_continuous(limits = c(0, 54), breaks = seq(0, 54, by = 18)) +
-  scale_color_discrete("Condition") +
-  labs(
-    title = "Check for data completeness - After Excluding Outliers",
-    x = "Participant Number",
-    y = "Number of Data"
-  )
 # --- Calculate Data Loss ---
 # Identify which conditions are losing the most data
 (loss_report <- rawData.filter %>%
   anti_join(shortData, by = c("sbjN", "trial_number", "condN", "BLOCK")) %>%
-  count(condN, name = "excluded_count"))
+  count(sbjN,condN, BLOCK,trial_number, name = "excluded_count"))
 
 cat(sprintf(
   "%d/%d trials removed: %.2f%%\n",
@@ -385,11 +375,18 @@ cat(sprintf(
 
 
 # To calculate change of Beta power
-# present data frame_ one column for C3, one column for C4
+# present data frame in one column for C3, one column for C4
 parData <- longData %>%
   select(sbjN:delta, location, timing, powerBeta) %>%
   pivot_wider(names_from = location, values_from = powerBeta) %>%
   mutate(PowerDiff = C3 - C4)
+
+ggplot(parData) +
+  geom_histogram(aes(x = PowerDiff), alpha = .5, position = "identity") +
+  facet_wrap(~timing) +
+  scale_x_continuous(sprintf("Beta %s C3-C4", predictor.name)) +
+  # scale_y_continuous(limits = c(0, 2000)) +
+  labs(title = sprintf("Distribution of Beta %s after filtering out outliers", predictor.name))
 
 byBaseline.shortData <- shortData %>%
   select(sbjN:absError, starts_with("C3"), starts_with("C4"))
@@ -443,6 +440,27 @@ byBaseline.parData <- byBaseline.longData %>%
   select(sbjN:absError, location, timing, powerBeta) %>%
   pivot_wider(names_from = location, values_from = powerBeta) %>%
   mutate(PowerDiff = C3 - C4)
+
+testmerge4 <- shortData %>%
+  mutate(sbjN = str_extract(sbjN, "\\d+") %>% as.numeric()) %>%
+  group_by(sbjN, task, mov, unimodal) %>%
+  summarise(n = n()) %>%
+  mutate(remain_percent = case_when(
+    unimodal == "Self-touch" ~ n / 54,
+    unimodal == "Unimodal" ~ n / 36
+  ))
+
+ggplot(testmerge4) +
+  geom_point(aes(x = sbjN, y = n, color = unimodal)) +
+  facet_wrap(task ~ mov) +
+  scale_x_continuous(limits = c(0, 25), breaks = seq(0, 24, 1)) +
+  scale_y_continuous(limits = c(0, 54), breaks = seq(0, 54, by = 18)) +
+  scale_color_discrete("Condition") +
+  labs(
+    title = "Check for data completeness - After Excluding Outliers",
+    x = "Participant Number",
+    y = "Number of Data"
+  )
 
 rm(list = c(ls(pattern = "raw|test")))
 ```
@@ -549,7 +567,7 @@ grid.arrange(p2, p1, ncol = 2)
 ```
 
 ## Calculate Interference Coefficients
-```{r ICs, fig.height= 4, fig.width= 7, warning=FALSE, message=FALSE, collapse = TRUE}
+```{r ICs, fig.height= 7, fig.width= 7, warning=FALSE, message=FALSE, collapse = TRUE}
 w <- shortData %>%
   filter(unimodal == "Self-touch") %>%
   # filter(gain != 1.25, gain != 0.8)  %>%
@@ -622,16 +640,22 @@ nice(full_ANOVA)
   
   $$estError = \frac{reported length}{target length}\ - 1$$
   
-  - **ABSOLUTE Estimation Error** quantifies *perceptual interference* without negative value, i.e., the degree to which the perceptual judgement deviates from the target (true) value OR how much the perceptual judgement is interfered by other information.
+  - The balance of interhemispheric activity refers to the trial-level difference in beta power between C3 and C4 electrodes. It represents the degree to which motor activity interferes with tactile processing. 
   
-  $$|estError| = |\frac{reported length}{target length}\ - 1|$$
-  
-  - **Beta Power Difference** between the left hemisphere (C3) and the right hemisphere (C4) represents the degree to which motor activity interferes with tactile processing. Positive difference implies weaker interference of motor information (tactile focus), while negative difference implies stronger interference of motor information (motor focus).
-  
-  $$\Delta{B} = B_{C3} - B_{C4}$$
-  
+  This beta power difference could be calculated for the raw beta power (μV^2) of C3 and C4 as: 
 
-Because movement and tactile spatial percepts during self-touch are interfered by the processing of tactile and movement information, respectively, we expect that the neural marker of these two components could be used to predict judgement accuracy. For example, a negative difference in beta power between C3 and C4 *(C3 - C4)* reflects larger processing of motor information relative to tactile information and may suggest that motor information is weighted more in movement judgement than touch judgement
+  $$\Delta{\beta_{raw}} = \beta_{C3(μV^2)}-\beta_{C4(μV^2)}$$
+
+  A positive difference occurs when the absolute beta power is higher in the motor-related electrode C3 (tactile focus state of processing), while a negative difference occurs when beta power in the tactile-related electrode C4 (motor focus state). 
+  
+  Optional: Because raw EEG power is positively skewed, we applied the subtraction with the log-normalized beta power (dB) to satisfy the requirement for a Normal distributed predictor. The difference in log-transformed beta power could be expressed as beta power log-ratio:
+  
+  $$\Delta{\beta_{dB}} = \beta_{C3(dB)}-\beta_{C4(dB)}= 10 \times log_{10}\beta_{C3(μV^2)}-10 \times log_{10}\beta_{C4(μV^2)} =10 \times log_{10}{\frac{\beta_{C3(μV^2)}}{\beta_{C4(μV^2)}}}$$
+
+  
+Unlike the absolute power difference, a positive ratio value such as +10 dB would mean the beta power in channel C3 is 10 times the power in channel C3, suggests a stronger focus on tactile processing, while a negative difference is associated with less beta power in channel C3, indicating a stronger motor processing. By using the difference of logs, the log-ratio index additionally ensures that the proportional changes in interhemispheric balance are treated symmetrically by the statistical model.
+
+**This script will use beta `r predictor.name` as the continuous predictor for estimation error.**
 
 <p style="text-align: justify;">
 
@@ -702,11 +726,22 @@ ggplot(plotData) +
 ## Self-touch: Interhemispheric interference
 **Does the relative difference in beta power between channel C3 and C4 during self-touch explain the asymmetrical, bidirectional interference of movement and tactile spatial percepts?**
 
+**Does interhemispheric balance predict how accurate participants are around the target?**
 H: Negative difference in the beta power between the channels C3 and C4 [C3-C4] (i.e., stronger motor processing than tactile processing) is associated with smaller error in move judgement and larger error in touch judgement.
 
-### Model 1A: Does interhemispheric balance predict how accurate participants are around the target?
+```{r Data for the model, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+filter.timing <- "Full"
+predictData <- parData %>%
+  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing, "Movement")) %>%
+  mutate(sbjN = factor(sbjN)) %>%
+  mutate(
+    estError = (resp - Target_length) / Target_length,
+    GAIN = flipped.gain
+  )
+```
 
-We fit a linear mixed-effects model of the fixed effects including 
+
+One could fit a linear mixed-effects model of the fixed effects including 
 
 - [1] **interhemispheric balance**: trial-level difference in beta power between C3 and C4 electrodes. A positive difference is associated with a focus on tactile processing, and a negative difference is associated with stronger motor processing 
 
@@ -716,30 +751,63 @@ We fit a linear mixed-effects model of the fixed effects including
 
 - [4] **non-unity gain**: Move < Touch (i.e., 1:1.5, reference) vs Move > Touch (i.e., 1.5:1) 
 
-To account for repeated measures within participants, we included a random intercept for subject.
+```{r Coding scheme 1A, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE, eval = FALSE, include = TRUE} 
+# # CODING APPROACH 1: DUMMY CODING
+# # 1. Set Passive as the Reference
+# # Assuming "Passive" is the first (reference) level
+# predictData$mov <- relevel(predictData$mov, ref = "Passive")
+# (contrasts(predictData$mov) <- contr.treatment(2))
+# 
+# # 2. Set Touch as reference
+# (contrasts(predictData$task) <- contr.treatment(2))
+# 
+# # 3. Set Gain contr.treatment(2)
+# predictData$gain <- factor(predictData$gain, levels = c("Move < Touch", "Move > Touch"))
+# (contrasts(predictData$gain) <- contr.treatment(2))
 
-```{r Model 1A, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-filter.timing <- "Full"
-predictData <- parData %>%
-  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing, "Movement")) %>%
-  mutate(sbjN = factor(sbjN)) %>%
-  mutate(
-    estError = (resp - Target_length) / Target_length,
-    GAIN = flipped.gain
-  )
+```
 
-# CODING APPROACH 1: DUMMY CODING
-# 1. Set Passive as the Reference
-# Assuming "Passive" is the first (reference) level
+
+We could also use a mixed coding approach to facilitate the interpretation of our theoretical factors as following: 
+
+- [1] **interhemispheric balance**: trial-level Beta `r predictor.name`` between C3 and C4 electrodes. A positive difference is associated with a focus on tactile processing, and a negative difference is associated with stronger motor processing 
+
+- [2] **task**: Judge Touch (reference) vs Judge Movement
+
+- [3] **movement type**: Passive (reference) vs Active]
+
+- [4] **non-unity gain**: Move < Touch (i.e., 1:1.5, reference) vs Move > Touch (i.e., 1.5:1) 
+
+
+Movement type was dummy-coded to treat the Passive condition as the reference level. The model coefficients for the Active condition could quantify the changes in judgement induced by the presence of an efferent copy of the motor command. Task and gain are sum-coded to account for their distinct qualitative nature arising from different modalities and symmetrical spatial decoupling, respectively. Sum coding is chosen to represent deviations from the experimental mean. Post-hoc comparisons and slope estimates were derived using the emmeans package. 
+
+We assume that judging touch and judging movement are equivalent tasks, as well as no effect of modality on gain. Therefore, we apply for a mixed coding approach that kept the dummy coding of movement type (i.e., Passive condition as reference level) and sum-coded task (Judge Touch vs Judge Movement) and gain. 
+
+```{r Coding scheme 1B, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# CODING APPROACH 2: MIXED CODING APPROACH
+# 1. Set Passive as the Reference (Dummy Coding)
+# Assuming "Passive" is the first level alphabetically; if not, use relevel()
 predictData$mov <- relevel(predictData$mov, ref = "Passive")
-(contrasts(predictData$mov) <- contr.treatment(2))
+contrasts(predictData$mov) <- contr.treatment(2)
 
-# 2. Set Touch as reference
-(contrasts(predictData$task) <- contr.treatment(2))
+# 2. Set Touch vs Move as Sum Coding (Effect Coding)
+contrasts(predictData$task) <- contr.sum(2)
 
-# 3. Set Gain contr.treatment(2)
+# 3. Set Gain as Sum Coding (Effect Coding)
 predictData$gain <- factor(predictData$gain, levels = c("Move < Touch", "Move > Touch"))
-(contrasts(predictData$gain) <- contr.treatment(2))
+contrasts(predictData$gain) <- contr.sum(2)
+
+```
+
+
+### Linear Mixed Model
+
+For the model, we included a random intercept for subject to account for repeated measures within participants.
+
+```{r LMER, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# LINEAR MIXED MODEL
+# Predicting Estimation Error based on the 4-way interaction of Beta Power Ratio,
+# Task, Movement Type, and Gain, with random intercepts for Subjects
 
 # Fit the linear mixed model
 model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
@@ -759,48 +827,44 @@ summary_df <- as.data.frame(summary(model)$coefficients) %>%
     str_replace_all("gain2", "Gain [M>T]") %>%
     str_replace_all(":", " × "))
 
+xlsx_name <- sprintf("lmer_results_%s_%s.xlsx", power.type, script_time)
 xlsx::write.xlsx(
   x = summary_df %>%
     mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
-  sheetName = "p1A_lmer",
+  sheetName = "p1B_lmer",
   file = file.path(
     pathlist$result_path,
-    paste0("lmer_results_", power.type, ".xlsx")
+    xlsx_name
+  ), append = TRUE
+)
+
+# Anova result
+anova.model <- anova(model)
+print(anova.model)
+
+rownames(anova.model) <- rownames(anova.model) %>%
+  str_replace_all("PowerDiff", predictor.name) %>%
+  str_replace_all("task", "Task") %>%
+  str_replace_all("mov", "Movement") %>%
+  str_replace_all("gain", "Gain") %>%
+  str_replace_all(":", " × ")
+
+xlsx_name <- sprintf("lmer_results_%s_%s.xlsx", power.type, script_time)
+xlsx::write.xlsx(
+  x = anova.model %>% round(3) %>%
+    mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
+  sheetName = "p1B_anova",
+  file = file.path(
+    pathlist$result_path,
+    xlsx_name
   ), append = TRUE
 )
 
 # Generate predictions for PowerDiff across task, mov, and gain
 pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
 
-# # Comment PHUC: Wrong plot? Does geom_smooth lm does the same thing as lmer()?
-# ggplot(
-#   predictData,
-#   aes(x = PowerDiff, y = estError, color = task)
-# ) +
-#   geom_hline(yintercept = 0, linetype = "dashed") +
-#   geom_vline(xintercept = 0, linetype = "dashed") +
-#   geom_point(alpha = .05, show.legend = F) +
-#   geom_smooth(method = "lm", show.legend = T) +
-#   labs(
-#     title = "Predicting Judgement Error with Difference of Beta Power",
-#     x = "Beta Power Difference: C3 - C4",
-#     y = "Judgement Error\n(both Over and Underestimation)"
-#   ) +
-#   scale_color_manual("Task", values = palette$two.color1) +
-#   scale_x_continuous(limits = c(-6.5, 5.5)) +
-#   scale_y_continuous(limits = c(-1, 2.5)) +
-#   facet_grid(gain ~ mov) +
-#   theme(
-#     aspect.ratio = 1,
-#     legend.position = "bottom",
-#     strip.text = element_text(size = 16),
-#     panel.spacing = unit(1, "lines"),
-#     plot.title = element_text(size = 19),
-#     axis.text = element_text(size = 18),
-#     axis.title = element_text(size = 18)
-#   )
 x_axis <- ifelse(power.type == "raw",
-  expression(paste("Beta Power Difference", " power (", mV^2, ")")),
+  expression(paste("Beta Power Difference (", mV^2, ")")),
   ifelse(power.type == "log",
     expression(paste("Beta Power Log-Ratio (dB)"))
   )
@@ -813,12 +877,12 @@ p0 <- ggplot(pred, aes(x = x, y = predicted, color = group)) +
   annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
   geom_line(size = 1) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
-  facet_grid(panel ~ facet) + # Adjust based on ggpredict output (mov × gain)
+  facet_grid(facet ~ panel) + # Adjust based on ggpredict output (mov × gain)
   labs(
-    title = paste("Predicting Judgement Error with Beta Power during", filter.timing, "Self-touch"),
-    subtitle = paste0("Beta", predictor.name," x Task x Movement type x Gain"),
-    x = "Beta Power Difference: C3 - C4",
-    y = "Judgement Error\n(-1 = underestimation, 0 = accurate, +1 =overestimation)\n"
+    title = paste("Predicting Estimation Error with Beta Power during", filter.timing, "Self-touch"),
+    subtitle = paste0("Beta", predictor.name, " x Task x Movement type x Gain"),
+    x = x_axis,
+    y = "Estimation Error\n(-1 = underestimation, 0 = accurate, +1 =overestimation)\n"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
   scale_fill_manual("Task", values = palette$two.color1) +
@@ -832,42 +896,63 @@ p0 <- ggplot(pred, aes(x = x, y = predicted, color = group)) +
     axis.title = element_text(size = 18)
   )
 p0
-
-(anova.model <- anova(model))
-rownames(anova.model) <- rownames(anova.model) %>%
-  str_replace_all("PowerDiff", predictor.name) %>%
-  str_replace_all("task", "Task") %>%
-  str_replace_all("mov", "Movement") %>%
-  str_replace_all("gain", "Gain") %>%
-  str_replace_all(":", " × ")
-xlsx::write.xlsx(
-  x = anova.model %>% round(3) %>%
-    mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
-  sheetName = "p1A_anova",
-  file = file.path(
-    pathlist$result_path,
-    paste0("lmer_results_", power.type, ".xlsx")
-  ), append = TRUE
-)
-
-cs <- emtrends(model, pairwise ~ mov, var = "PowerDiff")
-css <- summary(cs)
-css$contrasts
-css$emtrends # the slope of participants’ estimation error against beta power difference for each
-
-
-cs <- emtrends(model, pairwise ~ task * gain, var = "PowerDiff")
-css <- summary(cs)
-css$contrasts
-css$emtrends # the slope of participants’ estimation error against beta power difference for each
-
-cs <- emtrends(model, pairwise ~ task * mov * gain, var = "PowerDiff")
-css <- summary(cs)
-css$contrasts
-css$emtrends
 ```
 
 
+### Post hoc: Slope analysis
+
+We now estimate the specific relationship (slope) between Beta Power and Estimation Error across Task, Movement, and Gain conditions to clarify the multiple interactions. 
+
+First slope analysis: Movement effect (Passive vs Active)
+```{r Post hoc Slope 1, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# POST HOC 1: Slope analysis
+# Testing Slopes: Movement effect (Passive vs Active)
+cs <- emtrends(model, pairwise ~ mov, var = "PowerDiff")
+css <- summary(cs)
+print(css$contrasts)
+print(css$emtrends)
+
+
+```
+
+
+
+Second slope analysis: Task x Gain interaction
+```{r Post hoc Slope 2, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# Testing Slopes: Task x Gain interaction
+cs <- emtrends(model, pairwise ~ task * gain, var = "PowerDiff")
+css <- summary(cs)
+print(css$contrasts)
+print(css$emtrends)
+```
+
+
+
+Third slope analysis: Movement by combi of Task x Gain interaction
+```{r Post hoc Slope 3, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+
+# Testing Slopes: MoV in different Task x Gain interaction
+cs <- emtrends(model, pairwise ~ mov | task * gain, var = "PowerDiff")
+css <- summary(cs)
+print(css$contrasts)
+print(css$emtrends)
+
+```
+
+
+
+Forth slope analysis: Move x Task x Gain interaction
+```{r Post hoc Slope 4, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+
+# Testing Slopes: MoV in different Task x Gain interaction
+cs <- emtrends(model, pairwise ~ task * gain * mov, var = "PowerDiff")
+css <- summary(cs)
+print(css$contrasts %>% arrange(p.value))
+print(css$emtrends)
+```
+
+
+### Post hoc 2:  Estimated Marginal Mean (EMM)
 
 **Additional investigation**: In the condition $\text{Judge Movement}:\text{Passive}:\text{Move > Touch}$, is the predicted estimation error ($\text{estError}$) equal to zero when the neural predictor ($\text{PowerDiff}$) is exactly zero?
 
@@ -875,121 +960,78 @@ css$emtrends
 
 - The $\text{emmeans}$ function can calculate the predicted mean of the dependent variable ($\text{estError}$) for any specific combination of factors, holding continuous predictors (like $\text{PowerDiff}$) at a specific value (e.g., zero).
 
-
-```{r Against 0, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-# Step 1: Calculate the EMM at $\text{PowerDiff} = 0$
-# 1. Define the specific condition of interest
-condition_of_interest <- c(task = "Judge Movement", mov = "Passive", gain = "Move > Touch")
-
-# 2. Use emmeans to find the predicted estError when PowerDiff is 0
+```{r Against 0, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# Step 1: Calculate the EMM at PowerDiff = 0
 emm_at_zero <- emmeans(model,
   specs = ~ task * mov * gain,
   at = list(PowerDiff = 0)
 )
-summary(emm_at_zero)
+emm_table = summary(emm_at_zero) %>% arrange(lower.CL,upper.CL)
+print(emm_table)
 
-# 3. Filter the result to just your condition
-emm_specific <- summary(emm_at_zero) %>%
-  filter(task == "Judge Movement", mov == "Passive", gain == "Move > Touch")
-
-# Step 2: Test the Hypothesis ($\text{Estimate} = 0$)
-# Test the specific estimate against zero
-test_result <- contrast(emm_at_zero,
-  method = "revpairwise",
-  by = "task", adjust = "none"
-) # Use adjust="none" or "Tukey" as needed
-
-# Filter the contrast output for the test: "Estimate vs. 0"
-# (Note: Often, if the CI from Step 1 does not include zero, the test is redundant)
-```
-
-The most important finding here is which conditions are not biased when the neural predictor is neutral. This demonstrates where the behavioral effects of $\text{task}$, $\text{mov}$, and $\text{gain}$ effectively cancel each other out:
-
-- Four conditions show NO significant bias at symmetrical processing ($\text{PowerDiff}=0$). This is quite powerful, as it suggests the behavioral effects of the sensory context are not a sufficient explanation for bias in these cases; the bias must be driven by the neural modulation ($\text{PowerDiff}$ interaction).
-
-- Four conditions do show a significant bias, meaning the combined effects of $\text{task}$, $\text{mov}$, and $\text{gain}$ create an inherent bias that the neural state must counteract or enhance.
-
-
-
-### Model 1B: New coding scheme
-
-We assume that judging touch and judging movement are equivalent tasks, as well as no effect of modality on gain. Therefore, we apply for a mixed coding approach that kept the dummy coding of movement type (i.e., Passive condition as reference level) and sum-coded task (Judge Touch vs Judge Movement) and gain. 
-
-```{r Model 1B, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-filter.timing <- "Full"
-predictData <- parData %>%
-  filter(flipped.gain != "1.Unity" & unimodal == "Self-touch" & timing == paste(filter.timing, "Movement")) %>%
-  mutate(sbjN = factor(sbjN)) %>%
-  mutate(
-    estError = (resp - Target_length) / Target_length,
-    GAIN = flipped.gain
-  )
-
-
-# CODING APPROACH 1: MIXED CODING APPROACH
-# 1. Set Passive as the Reference (Dummy Coding)
-# Assuming "Passive" is the first level alphabetically; if not, use relevel()
-predictData$mov <- relevel(predictData$mov, ref = "Passive")
-(contrasts(predictData$mov) <- contr.treatment(2))
-
-# 2. Set Touch vs Move as Sum Coding (Effect Coding)
-(contrasts(predictData$task) <- contr.sum(2))
-
-# 3. Set Gain as Sum Coding (Effect Coding)
-predictData$gain <- factor(predictData$gain, levels = c("Move < Touch", "Move > Touch"))
-(contrasts(predictData$gain) <- contr.sum(2))
-
-# Fit the linear mixed model
-model <- lmer(estError ~ PowerDiff * task * mov * gain + (1 | sbjN), data = predictData)
-
-# View the summary of the model
-summary(model)
-summary_df <- as.data.frame(summary(model)$coefficients) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  rownames_to_column("factor") %>%
-  mutate(factor = factor %>%
-    str_replace_all("PowerDiff", predictor.name) %>%
-    str_replace_all("task1", "Task [JudgeTouch]") %>%
-    str_replace_all("task2", "Task [JudgeMove]") %>%
-    str_replace_all("mov1", "Movement [Passive]") %>%
-    str_replace_all("mov2", "Movement [Active]") %>%
-    str_replace_all("gain1", "Gain [M<T]") %>%
-    str_replace_all("gain2", "Gain [M>T]") %>%
-    str_replace_all(":", " × "))
-
+xlsx_name <- sprintf("lmer_results_%s_%s.xlsx", power.type, script_time)
 xlsx::write.xlsx(
-  x = summary_df %>%
-    mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
-  sheetName = "p1B_lmer",
+  x = emm_table,
+  sheetName = "p1B_emm_table",
   file = file.path(
     pathlist$result_path,
-    paste0("lmer_results_", power.type, ".xlsx")
+    xlsx_name
+  ), append = TRUE
+)
+# Step 2: Test the Hypothesis ($\text{Estimate} = 0$)
+# Test the specific estimate against zero
+test_result <- contrast(emm_at_zero, 
+                        method = "revpairwise",
+                        by = "task",
+                        adjust = "Tukey"
+) # Use adjust="none" or "Tukey" as needed
+
+test_df = test_result %>% as.data.frame()
+print(test_df)
+# Filter the contrast output for the test: "Estimate vs. 0"
+# (Note: Often, if the CI from Step 1 does not include zero, the test is redundant)
+
+
+xlsx::write.xlsx(
+  x = test_df,
+  sheetName = "p1B_emm_contrast",
+  file = file.path(
+    pathlist$result_path,
+    xlsx_name
   ), append = TRUE
 )
 
-# Generate predictions for PowerDiff across task, mov, and gain
-pred <- ggpredict(model, terms = c("PowerDiff [all]", "task", "mov", "gain"))
+# Step 3: Plot EMMs
+library(tidyverse)
 
-x_axis <- ifelse(power.type == "raw",
-  expression(paste("Beta Power Difference", " power (", mV^2, ")")),
-  ifelse(power.type == "log",
-    expression(paste("Beta Power Log-Ratio (dB)"))
-  )
-)
-# Plot predictions
-p0 <- ggplot(pred, aes(x = x, y = predicted, color = group)) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  annotate("text", x = -.5, y = +Inf, label = sprintf("\u2190\u2190\u2190\nmotor-focused"), color = palette$two.color1[2], hjust = 1, vjust = "top", size = 12 / .pt) +
-  annotate("text", x = +.5, y = +Inf, label = sprintf("\u2192\u2192\u2192\ntactile-focused"), color = palette$two.color1[1], hjust = 0, vjust = "top", size = 12 / .pt) +
-  geom_line(size = 1) +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
-  facet_grid(panel ~ facet) + # Adjust based on ggpredict output (mov × gain)
+# Assuming your summary table is named 'emm_table'
+emm_table <- emm_table %>%
+  mutate(
+    # Define the Relationship based on Task and Gain
+    relationship = case_when(
+      task == "Judge Touch"    & gain == "Move > Touch" ~ "Target < Interference",
+      task == "Judge Touch"    & gain == "Move < Touch" ~ "Target > Interference",
+      task == "Judge Movement" & gain == "Move > Touch" ~ "Target > Interference",
+      task == "Judge Movement" & gain == "Move < Touch" ~ "Target < Interference"
+    ),
+    # Define if the estimate is statistically different from zero
+    Status = case_when(
+      lower.CL > 0 ~ "Overestimation",
+      upper.CL < 0 ~ "Underestimation",
+      TRUE         ~ "Accurate"
+    )
+  ) %>%
+  arrange(task,mov, relationship)
+
+p0 <- ggplot(data = emm_table)+
+  geom_point(aes(x= "", y= emmean, color = task))+
+  geom_errorbar(aes(x= "", ymin=emmean-SE, ymax=emmean+SE, color = task))+
+  facet_grid(mov~gain, drop = TRUE)+ 
   labs(
-    title = paste("Predicting Judgement Error with Beta Power during", filter.timing, "Self-touch"),
-    subtitle = paste0("Beta", predictor.name," x Task x Movement type x Gain"),
-    x = x_axis,
-    y = "Judgement Error\n(-1 = underestimation, 0 = accurate, +1 =overestimation)\n"
+    title = paste("Estimation Error at with Beta Power Difference = 0 ", filter.timing, "Self-touch"),
+    subtitle = paste0("Beta", predictor.name, " x Task x Movement type x Gain"),
+    x = "Movement type",
+    y = "Estimation Error\n(-1 = underestimation, 0 = accurate, +1 =overestimation)\n"
   ) +
   scale_color_manual("Task", values = palette$two.color1) +
   scale_fill_manual("Task", values = palette$two.color1) +
@@ -1003,38 +1045,10 @@ p0 <- ggplot(pred, aes(x = x, y = predicted, color = group)) +
     axis.title = element_text(size = 18)
   )
 p0
-
-(anova.model <- anova(model))
-rownames(anova.model) <- rownames(anova.model) %>%
-  str_replace_all("PowerDiff", predictor.name) %>%
-  str_replace_all("task", "Task") %>%
-  str_replace_all("mov", "Movement") %>%
-  str_replace_all("gain", "Gain") %>%
-  str_replace_all(":", " × ")
-xlsx::write.xlsx(
-  x = anova.model %>% round(3) %>%
-    mutate(across(where(is.numeric), ~ format(.x, decimal.mark = "."))),
-  sheetName = "p1B_anova",
-  file = file.path(
-    pathlist$result_path,
-    paste0("lmer_results_", power.type, ".xlsx")
-  ), append = TRUE
-)
-
-
-cs <- emtrends(model, pairwise ~ mov, var = "PowerDiff")
-css <- summary(cs)
-css$contrasts
-css$emtrends # the slope of participants’ estimation error against beta power difference for each
-
-
-cs <- emtrends(model, pairwise ~ task * gain, var = "PowerDiff")
-css <- summary(cs)
-css$contrasts
-css$emtrends # the slope of participants’ estimation error against beta power difference for each
-
-cs <- emtrends(model, pairwise ~ task * mov * gain, var = "PowerDiff")
-css <- summary(cs)
-css$contrasts
-css$emtrends
 ```
+
+The most important finding here is which conditions are not biased when the neural predictor is neutral. This demonstrates where the behavioral effects of $\text{task}$, $\text{mov}$, and $\text{gain}$ effectively cancel each other out:
+
+- Four conditions show NO significant bias at symmetrical processing ($\text{PowerDiff}=0$). This is quite powerful, as it suggests the behavioral effects of the sensory context are not a sufficient explanation for bias in these cases; the bias must be driven by the neural modulation ($\text{PowerDiff}$ interaction).
+
+- Four conditions do show a significant bias, meaning the combined effects of $\text{task}$, $\text{mov}$, and $\text{gain}$ create an inherent bias that the neural state must counteract or enhance.
