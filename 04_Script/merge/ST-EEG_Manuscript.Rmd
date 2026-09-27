@@ -41,23 +41,28 @@ phases <- c(
   "After Movement"
 )
 vps <- c("P")
-Target.interference.analysis = TRUE
+Target.interference.analysis <- TRUE
 power.type <- c("raw", "log", "log_of_difference")[2] # change format of Beta power
 
-if (power.type == "raw") {predictor.name = "Power Difference"} else
-  if (power.type == "log") {predictor.name = "Power Log-Ratio"} else
-  if (power.type == "log_of_difference") {predictor.name = "Power Difference (log-transformed)"}
+if (power.type == "raw") {
+  predictor.name <- "Power Difference"
+} else if (power.type == "log") {
+  predictor.name <- "Power Log-Ratio"
+} else if (power.type == "log_of_difference") {
+  predictor.name <- "Power Difference (log-transformed)"
+}
 
 if (Target.interference.analysis == T) {
-  predictor.name = paste(predictor.name, "[Target - Interference]")
-  positive.label = "stronger interference"
-  negative.label = "weaker interference"} else
-  if (Target.interference.analysis == F) {
-    predictor.name = paste(predictor.name, "[C3-C4]")
-    positive.label = "tactile-focused"
-    negative.label = "motor-focused"} 
+  predictor.name <- paste(predictor.name, "[Target - Interference]")
+  positive.label <- "stronger interference"
+  negative.label <- "weaker interference"
+} else if (Target.interference.analysis == F) {
+  predictor.name <- paste(predictor.name, "[C3-C4]")
+  positive.label <- "tactile-focused"
+  negative.label <- "motor-focused"
+}
 
-preload.data = TRUE
+preload.data <- TRUE
 ```
 
 
@@ -131,8 +136,8 @@ merge_df <- merge_df %>%
   filter(!(NAME == "P22" & is.na(unimodal) & QUESTION == "t" & ACTIVE == "a" & BLOCK %in% c(3))) %>%
   filter(!(NAME == "P23" & is.na(unimodal) & QUESTION == "m" & ACTIVE == "p" & trial_number %in% c(50))) %>%
   filter(!(NAME == "P25" & !is.na(unimodal) & unimodal == "1" & QUESTION == "m" & ACTIVE == "a" & BLOCK %in% c(1))) %>%
-  # EEG preprocessing protocol: 
-  # channel rejection: C3 or C4 
+  # EEG preprocessing protocol:
+  # channel rejection: C3 or C4
   filter(!(NAME %in% c("P20"))) %>%
   # low ICA quality
   filter(!(NAME %in% c("P11", "P17", "P22")))
@@ -258,6 +263,9 @@ rawData.filter <- filter_outliers(
   df = rawData %>% mutate(puffer = 1 %>% as.factor()),
   value_col = "estError", group_cols = filter.choice[[1]]
 ) # filter extreme response
+
+rawData.filter = rawData
+
 ggplot(rawData) +
   geom_histogram(aes(x = 100 * estError)) +
   scale_x_continuous("Estimation Error (%)", limits = c(-150, 300)) +
@@ -280,7 +288,6 @@ cat(sprintf(
 (loss_report <- rawData %>%
   anti_join(rawData.filter, by = c("sbjN", "condN", "BLOCK", "trial_number")) %>%
   count(condN, name = "excluded_count"))
-
 ```
 
 
@@ -289,7 +296,11 @@ cat(sprintf(
 We filter extremes and Log transform the skewed Beta power values at each channel and movement phase
 
 ```{r Filter extreme beta power values, fig.width=12, fig.height=5, echo=FALSE, warning=FALSE, message=FALSE}
+
+
+
 longrawData <- long_beh_eeg_df(rawData.filter)
+
 ggplot(longrawData) +
   geom_histogram(aes(x = powerBeta, fill = location), alpha = .5, position = "identity") +
   facet_wrap(~timing) +
@@ -305,6 +316,9 @@ filter.choice <- list(
 )
 # filtering outliers
 longData <- filter_outliers(df = longrawData, value_col = "powerBeta", group_cols = filter.choice[[4]])
+
+longData = longrawData
+
 ggplot(longData) +
   geom_histogram(aes(x = powerBeta, fill = location), alpha = .5, position = "identity") +
   facet_wrap(~timing) +
@@ -331,27 +345,32 @@ shortData <- short_beh_eeg_df(longData %>% select(sbjN:powerBeta)) %>%
   mutate(unimodal = as.factor(unimodal))
 
 # QQplot
-shortData <- shortData%>%
-         mutate(PowerDiff = case_when(task == "Judge Touch" ~C4_full-C3_full,
-                                      task == "Judge Movement"  ~C3_full-C4_full)
-                )
-ggplot(shortData, 
-    aes(sample = PowerDiff)) +
+shortData <- shortData %>%
+  mutate(PowerDiff = case_when(
+    task == "Judge Touch" ~ C4_full - C3_full,
+    task == "Judge Movement" ~ C3_full - C4_full
+  ))
+ggplot(
+  shortData,
+  aes(sample = PowerDiff)
+) +
   stat_qq() +
   stat_qq_line(color = "red") +
   labs(title = "Beta Power Difference: Normal Q-Q Plot before log10 transformation")
 # shapiro.test(shortData$PowerDiff)
 # 'pnorm' tells the test to compare data against a normal distribution
-ks.test(shortData$PowerDiff %>% na.omit(), 
-        "pnorm", 
-        mean(shortData$PowerDiff %>% na.omit()), 
-        sd(shortData$PowerDiff %>% na.omit()))
+ks.test(
+  shortData$PowerDiff %>% na.omit(),
+  "pnorm",
+  mean(shortData$PowerDiff %>% na.omit()),
+  sd(shortData$PowerDiff %>% na.omit())
+)
 
 # --- Calculate Data Loss ---
 # Identify which conditions are losing the most data
 (loss_report <- rawData.filter %>%
   anti_join(shortData, by = c("sbjN", "trial_number", "condN", "BLOCK")) %>%
-  count(sbjN,condN, BLOCK,trial_number, name = "excluded_count"))
+  count(sbjN, condN, BLOCK, trial_number, name = "excluded_count"))
 
 cat(sprintf(
   "%d/%d trials removed: %.2f%%\n",
@@ -370,15 +389,17 @@ parData <- longData %>%
 
 if (Target.interference.analysis) {
   parData <- parData %>%
-    mutate(PowerDiff = case_when(task == "Judge Touch" ~ C4-C3,
-                               task == "Judge Movement"  ~ C3-C4))
+    mutate(PowerDiff = case_when(
+      task == "Judge Touch" ~ C4 - C3,
+      task == "Judge Movement" ~ C3 - C4
+    ))
 }
 
 if (power.type == "log_of_difference") {
   parData <- parData %>%
     mutate(PowerDiff = log10(PowerDiff))
 }
-  
+
 ### Check for normal distribution ----
 ggplot(parData) +
   geom_histogram(aes(x = PowerDiff), alpha = .5, position = "identity") +
@@ -391,10 +412,12 @@ ggplot(parData, aes(sample = PowerDiff)) +
   stat_qq() +
   stat_qq_line(color = "red") +
   labs(title = "Beta Power Difference: Normal Q-Q Plot after log10 transformation")
-ks.test(parData$PowerDiff %>% na.omit(), 
-        "pnorm", 
-        mean(parData$PowerDiff %>% na.omit()), 
-        sd(parData$PowerDiff %>% na.omit()))
+ks.test(
+  parData$PowerDiff %>% na.omit(),
+  "pnorm",
+  mean(parData$PowerDiff %>% na.omit()),
+  sd(parData$PowerDiff %>% na.omit())
+)
 
 byBaseline.shortData <- shortData %>%
   select(sbjN:absError, starts_with("C3"), starts_with("C4"))
@@ -451,7 +474,7 @@ byBaseline.parData <- byBaseline.longData %>%
   mutate(PowerDiff = C3 - C4)
 
 testmerge4 <- shortData %>%
-  filter(!is.na(C3_early) & !is.na(C4_early))%>%
+  filter(!is.na(C3_early) & !is.na(C4_early)) %>%
   mutate(sbjN = str_extract(sbjN, "\\d+") %>% as.numeric()) %>%
   group_by(sbjN, task, mov, unimodal) %>%
   summarise(n = n()) %>%
@@ -478,9 +501,8 @@ ggplot(testmerge4) +
 
 ```{r Exclude participant with large missing data, fig.width=12, fig.height=5, echo=TRUE, warning=FALSE, message=FALSE}
 # Early phase
-exclude = c("P01","P06","P10", "P14") # we have no cut-off to exclude particants with large NaNs 
-exclude = c()
-
+exclude <- c("P01", "P06", "P10", "P14") # we have no cut-off to exclude particants with large NaNs
+exclude <- c()
 ```
 
 # Participants
@@ -669,7 +691,6 @@ nice(full_ANOVA)
 
 
 ```{r Prepare for ANOVA1, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-
 # 1. Filter for EARLY movement (first ~1 second) and prep variables
 filter.timing <- "Early"
 
@@ -677,8 +698,10 @@ predictData <- parData %>%
   filter(unimodal == "Self-touch" & timing == paste(filter.timing, "Movement")) %>%
   filter(!is.na(PowerDiff)) %>%
   mutate(sbjN = factor(sbjN)) %>%
-  mutate(gain = case_when(gain == "Move = Touch" ~ "2Unity",
-                          gain != "Move = Touch" ~ "1NonUnity"))
+  mutate(gain = case_when(
+    gain == "Move = Touch" ~ "2Unity",
+    gain != "Move = Touch" ~ "1NonUnity"
+  ))
 
 # 2. Pre-aggregate: Calculate both Mean and Median per participant/cell
 subj_data <- predictData %>%
@@ -692,11 +715,11 @@ subj_data <- predictData %>%
 
 # 3. Run the ANOVA on the MEANS
 power_anova_mean <- aov_ez(
-  id = "sbjN",                           
-  dv = "mean_PowerDiff", # Using the pre-calculated mean                    
-  within = c("mov", "task", "gain"),     
+  id = "sbjN",
+  dv = "mean_PowerDiff", # Using the pre-calculated mean
+  within = c("mov", "task", "gain"),
   data = subj_data,
-  anova_table = list(correction = "GG", es = "pes") 
+  anova_table = list(correction = "GG", es = "pes")
 )
 
 print("ANOVA using MEAN Beta Asymmetry:")
@@ -704,18 +727,15 @@ nice(power_anova_mean)
 
 # 4. (Optional) Run the ANOVA on the MEDIANS for a robustness check
 power_anova_median <- aov_ez(
-  id = "sbjN",                           
-  dv = "median_PowerDiff", # Using the pre-calculated median                    
-  within = c("mov", "task", "gain"),     
+  id = "sbjN",
+  dv = "median_PowerDiff", # Using the pre-calculated median
+  within = c("mov", "task", "gain"),
   data = subj_data,
-  anova_table = list(correction = "GG", es = "pes") 
+  anova_table = list(correction = "GG", es = "pes")
 )
 
 print("ANOVA using MEDIAN Beta Asymmetry:")
 nice(power_anova_median)
-
-
-
 ```
 
 ```{r Posthoc1, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
@@ -741,11 +761,11 @@ pairs(emm_gain_by_mov, adjust = "holm")
 
 # 2. Main Effect of Task (p < .001)
 
-# Since df = 1 (meaning there are only 2 levels of task), the p-value for the 
-# pairwise comparison will match your ANOVA. This step is primarily to extract 
+# Since df = 1 (meaning there are only 2 levels of task), the p-value for the
+# pairwise comparison will match your ANOVA. This step is primarily to extract
 # the estimated marginal means so you know which task had a higher/lower PowerDiff.
 
-emm_task <- emmeans(power_anova_mean, ~ task)
+emm_task <- emmeans(power_anova_mean, ~task)
 
 cat("\n--- Estimated Marginal Means: Task ---\n")
 print(emm_task)
@@ -756,7 +776,6 @@ pairs(emm_task)
 
 
 ```{r Plot1a, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-
 # Calculate group-level data for plotting (using the subj_data you already made)
 plot_data <- subj_data %>%
   group_by(mov, task, gain) %>%
@@ -773,20 +792,23 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_point(size = 3, position = position_dodge(width = 0.3)) +
   geom_line(size = 1, position = position_dodge(width = 0.3)) +
-  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se), 
-                width = 0.2, size = 0.8, position = position_dodge(width = 0.3)) +
-  
+  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se),
+    width = 0.2, size = 0.8, position = position_dodge(width = 0.3)
+  ) +
+
   # Helper text
-  annotate("text", x = 1.5, y = Inf, label = paste("↑", positive.label), 
-           vjust = 2, color = "gray30", fontface = "italic", size = 4) +
-  annotate("text", x = 1.5, y = -Inf, label = paste("↓", negative.label), 
-           vjust = -1, color = "gray30", fontface = "italic", size = 4) +
-  
+  annotate("text",
+    x = 1.5, y = Inf, label = paste("↑", positive.label),
+    vjust = 2, color = "gray30", fontface = "italic", size = 4
+  ) +
+  annotate("text",
+    x = 1.5, y = -Inf, label = paste("↓", negative.label),
+    vjust = -1, color = "gray30", fontface = "italic", size = 4
+  ) +
   scale_color_manual(values = c("#DD6B20", "#667dff", "#00ab7c")) +
-  
+
   # Facet by Task to see the 3-way split
-  facet_wrap(~ task) +
-  
+  facet_wrap(~task) +
   labs(
     title = paste(filter.timing, "Movement: 3-Way Interaction on Beta Asymmetry"),
     subtitle = "How Movement, Task, and Gain interact to shift interhemispheric asymmetry index",
@@ -804,13 +826,11 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   )
 
 pAnova
-
 ```
 
 
 
-```{r Plot1b, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-
+```{r Plot1b mov x gain, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
 # 2. Pre-aggregate: Calculate both Mean and Median per participant/cell
 subj_data <- predictData %>%
   group_by(sbjN, mov, gain) %>%
@@ -837,17 +857,20 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_point(size = 3, position = position_dodge(width = 0.3)) +
   geom_line(size = 1, position = position_dodge(width = 0.3)) +
-  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se), 
-                width = 0.2, size = 0.8, position = position_dodge(width = 0.3)) +
-  
+  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se),
+    width = 0.2, size = 0.8, position = position_dodge(width = 0.3)
+  ) +
   scale_color_manual(values = c("#f64559", "#667dff", "#00ab7c")) +
-  
+
   # Helper text
-  annotate("text", x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)", 
-           vjust = 2, color = "gray30", fontface = "italic", size = 4) +
-  annotate("text", x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)", 
-           vjust = -1, color = "gray30", fontface = "italic", size = 4) +
-  
+  annotate("text",
+    x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)",
+    vjust = 2, color = "gray30", fontface = "italic", size = 4
+  ) +
+  annotate("text",
+    x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)",
+    vjust = -1, color = "gray30", fontface = "italic", size = 4
+  ) +
   labs(
     title = "Early Movement: 2-Way Interaction on Beta Asymmetry",
     subtitle = "How Movement and Gain interact to shift interhemispheric asymmetry index",
@@ -865,14 +888,73 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   )
 
 pAnova
+```
 
+
+```{r Plot1c task x gain, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# 2. Pre-aggregate: Calculate both Mean and Median per participant/cell
+subj_data <- predictData %>%
+  group_by(sbjN, task, gain) %>%
+  summarise(
+    mean_PowerDiff = mean(PowerDiff, na.rm = TRUE),
+    median_PowerDiff = median(PowerDiff, na.rm = TRUE),
+    trial_count = n(), # Good practice: keep track of how many trials made up this average
+    .groups = "drop"
+  )
+
+# Calculate group-level data for plotting (using the subj_data you already made)
+plot_data <- subj_data %>%
+  group_by(task, gain) %>%
+  summarise(
+    group_mean = mean(mean_PowerDiff, na.rm = TRUE),
+    sd = sd(mean_PowerDiff, na.rm = TRUE),
+    n = sum(!is.na(mean_PowerDiff)),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+# Plot the 3-Way Interaction
+pAnova <- ggplot(plot_data, aes(x = task, y = group_mean, color = gain, group = gain)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_point(size = 3, position = position_dodge(width = 0.3)) +
+  geom_line(size = 1, position = position_dodge(width = 0.3)) +
+  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se),
+    width = 0.2, size = 0.8, position = position_dodge(width = 0.3)
+  ) +
+  scale_color_manual(values = c("#f64559", "#667dff", "#00ab7c")) +
+
+  # Helper text
+  annotate("text",
+    x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)",
+    vjust = 2, color = "gray30", fontface = "italic", size = 4
+  ) +
+  annotate("text",
+    x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)",
+    vjust = -1, color = "gray30", fontface = "italic", size = 4
+  ) +
+  labs(
+    title = "Early Movement: 2-Way Interaction on Beta Asymmetry",
+    subtitle = "How Movement and Gain interact to shift interhemispheric asymmetry index",
+    x = "Judgement Task",
+    y = "Mean Beta Power Difference (C3 - C4)",
+    color = "Gain"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    strip.text = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "bottom"
+  )
+
+pAnova
 ```
 
 ### Three gains:
 
 
 ```{r Prepare for ANOVA, fig.width=16, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-
 # 1. Filter for EARLY movement (first ~1 second) and prep variables
 filter.timing <- "Early"
 
@@ -880,13 +962,16 @@ predictData <- parData %>%
   filter(unimodal == "Self-touch" & timing == paste(filter.timing, "Movement")) %>%
   filter(!is.na(PowerDiff)) %>%
   mutate(sbjN = factor(sbjN)) %>%
-  mutate(gain = factor(gain, levels = c("Move < Touch", 
-                                        "Move = Touch", 
-                                        "Move > Touch"), 
-                       label = c("Move < Touch", "Move = Touch", "Move > Touch")
-                       # label = c("LargerTouch", "Congruent", "LargerMove")
-                       )) # %>%
-  # mutate(gain = factor(flipped.gain, levels = c("Target < Interference", "1.Unity", "Target > Interference"), label = c("LargerInterference", "MatchingInformation", "SmallerInterference")))
+  mutate(gain = factor(gain,
+    levels = c(
+      "Move < Touch",
+      "Move = Touch",
+      "Move > Touch"
+    ),
+    label = c("Move < Touch", "Move = Touch", "Move > Touch")
+    # label = c("LargerTouch", "Congruent", "LargerMove")
+  )) # %>%
+# mutate(gain = factor(flipped.gain, levels = c("Target < Interference", "1.Unity", "Target > Interference"), label = c("LargerInterference", "MatchingInformation", "SmallerInterference")))
 
 # 2. Pre-aggregate: Calculate both Mean and Median per participant/cell
 subj_data <- predictData %>%
@@ -900,11 +985,11 @@ subj_data <- predictData %>%
 
 # 3. Run the ANOVA on the MEANS
 power_anova_mean <- aov_ez(
-  id = "sbjN",                           
-  dv = "mean_PowerDiff", # Using the pre-calculated mean                    
-  within = c("mov", "task", "gain"),     
+  id = "sbjN",
+  dv = "mean_PowerDiff", # Using the pre-calculated mean
+  within = c("mov", "task", "gain"),
   data = subj_data,
-  anova_table = list(correction = "GG", es = "pes") 
+  anova_table = list(correction = "GG", es = "pes")
 )
 
 print("ANOVA using MEAN Beta Asymmetry:")
@@ -912,18 +997,15 @@ nice(power_anova_mean)
 
 # 4. (Optional) Run the ANOVA on the MEDIANS for a robustness check
 power_anova_median <- aov_ez(
-  id = "sbjN",                           
-  dv = "median_PowerDiff", # Using the pre-calculated median                    
-  within = c("mov", "task", "gain"),     
+  id = "sbjN",
+  dv = "median_PowerDiff", # Using the pre-calculated median
+  within = c("mov", "task", "gain"),
   data = subj_data,
-  anova_table = list(correction = "GG", es = "pes") 
+  anova_table = list(correction = "GG", es = "pes")
 )
 
 print("ANOVA using MEDIAN Beta Asymmetry:")
 nice(power_anova_median)
-
-
-
 ```
 
 
@@ -950,11 +1032,11 @@ pairs(emm_gain_by_mov, adjust = "holm")
 
 # 2. Main Effect of Task (p < .001)
 
-# Since df = 1 (meaning there are only 2 levels of task), the p-value for the 
-# pairwise comparison will match your ANOVA. This step is primarily to extract 
+# Since df = 1 (meaning there are only 2 levels of task), the p-value for the
+# pairwise comparison will match your ANOVA. This step is primarily to extract
 # the estimated marginal means so you know which task had a higher/lower PowerDiff.
 
-emm_task <- emmeans(power_anova_mean, ~ task)
+emm_task <- emmeans(power_anova_mean, ~task)
 
 cat("\n--- Estimated Marginal Means: Task ---\n")
 print(emm_task)
@@ -964,7 +1046,6 @@ pairs(emm_task)
 ```
 
 ```{r Plota, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-
 # Calculate group-level data for plotting (using the subj_data you already made)
 plot_data <- subj_data %>%
   group_by(mov, task, gain) %>%
@@ -981,20 +1062,23 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_point(size = 3, position = position_dodge(width = 0.3)) +
   geom_line(size = 1, position = position_dodge(width = 0.3)) +
-  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se), 
-                width = 0.2, size = 0.8, position = position_dodge(width = 0.3)) +
-  
+  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se),
+    width = 0.2, size = 0.8, position = position_dodge(width = 0.3)
+  ) +
   scale_color_manual(values = c("#DD6B20", "#667dff", "#00ab7c")) +
-  
+
   # Helper text
-  annotate("text", x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)", 
-           vjust = 2, color = "gray30", fontface = "italic", size = 4) +
-  annotate("text", x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)", 
-           vjust = -1, color = "gray30", fontface = "italic", size = 4) +
-  
+  annotate("text",
+    x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)",
+    vjust = 2, color = "gray30", fontface = "italic", size = 4
+  ) +
+  annotate("text",
+    x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)",
+    vjust = -1, color = "gray30", fontface = "italic", size = 4
+  ) +
+
   # Facet by Task to see the 3-way split
-  facet_wrap(~ task) +
-  
+  facet_wrap(~task) +
   labs(
     title = paste(filter.timing, "Movement: 3-Way Interaction on Beta Asymmetry"),
     subtitle = "How Movement, Task, and Gain interact to shift interhemispheric asymmetry index",
@@ -1012,11 +1096,9 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   )
 
 pAnova
-
 ```
 
 ```{r Plotb, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
-
 # 2. Pre-aggregate: Calculate both Mean and Median per participant/cell
 subj_data <- predictData %>%
   group_by(sbjN, mov, gain) %>%
@@ -1043,17 +1125,20 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_point(size = 3, position = position_dodge(width = 0.3)) +
   geom_line(size = 1, position = position_dodge(width = 0.3)) +
-  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se), 
-                width = 0.2, size = 0.8, position = position_dodge(width = 0.3)) +
-  
+  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se),
+    width = 0.2, size = 0.8, position = position_dodge(width = 0.3)
+  ) +
   scale_color_manual(values = c("#DD6B20", "#667dff", "#00ab7c")) +
-  
+
   # Helper text
-  annotate("text", x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)", 
-           vjust = 2, color = "gray30", fontface = "italic", size = 4) +
-  annotate("text", x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)", 
-           vjust = -1, color = "gray30", fontface = "italic", size = 4) +
-  
+  annotate("text",
+    x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)",
+    vjust = 2, color = "gray30", fontface = "italic", size = 4
+  ) +
+  annotate("text",
+    x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)",
+    vjust = -1, color = "gray30", fontface = "italic", size = 4
+  ) +
   labs(
     title = "Early Movement: 2-Way Interaction on Beta Asymmetry",
     subtitle = "How Movement and Gain interact to shift interhemispheric asymmetry index",
@@ -1071,6 +1156,65 @@ pAnova <- ggplot(plot_data, aes(x = mov, y = group_mean, color = gain, group = g
   )
 
 pAnova
-
 ```
 
+
+```{r Plot2c task x gain, fig.width=10, fig.height=10, echo=TRUE, warning=FALSE, message=FALSE} 
+# 2. Pre-aggregate: Calculate both Mean and Median per participant/cell
+subj_data <- predictData %>%
+  group_by(sbjN, task, gain) %>%
+  summarise(
+    mean_PowerDiff = mean(PowerDiff, na.rm = TRUE),
+    median_PowerDiff = median(PowerDiff, na.rm = TRUE),
+    trial_count = n(), # Good practice: keep track of how many trials made up this average
+    .groups = "drop"
+  )
+
+# Calculate group-level data for plotting (using the subj_data you already made)
+plot_data <- subj_data %>%
+  group_by(task, gain) %>%
+  summarise(
+    group_mean = mean(mean_PowerDiff, na.rm = TRUE),
+    sd = sd(mean_PowerDiff, na.rm = TRUE),
+    n = sum(!is.na(mean_PowerDiff)),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+# Plot the 3-Way Interaction
+pAnova <- ggplot(plot_data, aes(x = task, y = group_mean, color = gain, group = gain)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_point(size = 3, position = position_dodge(width = 0.3)) +
+  geom_line(size = 1, position = position_dodge(width = 0.3)) +
+  geom_errorbar(aes(ymin = group_mean - se, ymax = group_mean + se),
+    width = 0.2, size = 0.8, position = position_dodge(width = 0.3)
+  ) +
+  scale_color_manual(values = c("#f64559", "#667dff", "#00ab7c")) +
+
+  # Helper text
+  annotate("text",
+    x = 1.5, y = Inf, label = "↑ Tactile Focus (C3 > C4)",
+    vjust = 2, color = "gray30", fontface = "italic", size = 4
+  ) +
+  annotate("text",
+    x = 1.5, y = -Inf, label = "↓ Motor Focus (C4 > C3)",
+    vjust = -1, color = "gray30", fontface = "italic", size = 4
+  ) +
+  labs(
+    title = "Early Movement: 2-Way Interaction on Beta Asymmetry",
+    subtitle = "How Movement and Gain interact to shift interhemispheric asymmetry index",
+    x = "Judgement Task",
+    y = "Mean Beta Power Difference (C3 - C4)",
+    color = "Gain"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    strip.text = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "bottom"
+  )
+
+pAnova
+```
